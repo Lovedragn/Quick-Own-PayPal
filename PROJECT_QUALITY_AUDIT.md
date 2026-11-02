@@ -81,7 +81,7 @@ The structure is intentionally small, but most of the UI, page state, helper fun
 
 - Backend: `mvnw clean verify` passed with 71 tests, zero failures, errors or skips.
 - Frontend: `npm ci`, `npm run lint` and `npm run build` passed on the synchronized Git clone.
-- GitHub Actions run for commit `1bb8dc9`: both Java 21 backend and Node 22 frontend jobs passed.
+- GitHub Actions run for commit cdb25d6 (latest quality-review commit) passed both Java 21 backend and Node 22 frontend jobs.
 - Live Gemini + Channel3 recommendation returned a catalogue-backed iPhone 16 with product ID, merchant offer, price and URL.
 - PayPal Sandbox order creation, buyer approval and backend order-status verification completed for USD 565.00. Status was `COMPLETED`; the local record contained a capture ID.
 - Frontend home, success and cancellation routes compiled and were served locally. The final receipt UI was not separately verified in a real browser after PayPal returned; perform that visual rehearsal before recording the final video.
