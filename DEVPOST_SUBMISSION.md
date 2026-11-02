@@ -35,6 +35,14 @@ Optional Amazon.in Creators API and Flipkart Affiliate adapters are implemented,
 - **Payments:** PayPal OAuth 2.0 and the PayPal Orders v2 API are used in the Sandbox environment for order creation, approval, capture, status and recovery.
 - **Reliability:** Checkout uses a required idempotency key, server-side repricing, exact offer revalidation, currency checks, persisted order state and duplicate-capture recovery.
 
+## Verified implementation evidence
+
+- Backend Maven verification: 71 tests passed with zero failures, errors or skips.
+- Frontend ESLint and optimized production build passed locally and in GitHub Actions.
+- GitHub Actions run #1 passed both Java 21 and Node 22 jobs on the public Prapitesh branch.
+- A live Gemini + Channel3 iPhone 16 recommendation returned catalogue-backed product and offer data.
+- PayPal Sandbox order creation, buyer approval and order-status verification completed for USD 565.00; backend status was `COMPLETED`.
+
 ## What is meaningful about the PayPal integration?
 
 PayPal is part of the actual checkout journey, not a decorative link. After a shopper chooses an offer, the backend independently recalculates the cart and creates a PayPal Sandbox order. The buyer must approve the order with PayPal. Quick-Own then checks PayPal's approved amount and currency against its server-calculated total before capture. Capture retries reconcile an already-completed PayPal order instead of blindly charging again.

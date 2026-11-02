@@ -166,7 +166,13 @@ npm run build
 
 ## Continuous integration
 
+[![Quick-Own CI](https://github.com/Lovedragn/Quick-Own-PayPal/actions/workflows/ci.yml/badge.svg?branch=Prapitesh)](https://github.com/Lovedragn/Quick-Own-PayPal/actions/workflows/ci.yml)
+
+
+
 GitHub Actions runs backend tests on Java 21 and frontend ESLint/production-build checks on pushes and pull requests targeting main or Prapitesh. See .github/workflows/ci.yml.
+
+GitHub Actions run #1 for commit ea5f590 passed both jobs: Java 21 backend verification and Node 22 frontend lint/production build. The production dependency audit reports zero vulnerabilities; the development-only audit reports moderate ESLint-chain advisories and no high or critical findings.
 
 ## API overview
 

@@ -34,6 +34,9 @@ This checklist separates the hackathon requirements from optional quality improv
 - [x] CORS preflight from `http://localhost:3000` returned 200 and allowed `content-type, idempotency-key`.
 - [x] GitHub Actions CI workflow added for Java 21 backend tests and Node 22 frontend lint/build.
 
+- [x] GitHub Actions run #1 on commit ea5f590 passed backend and frontend jobs.
+- [x] Production dependency audit: zero vulnerabilities; development-tool audit: moderate ESLint-chain advisories only, no high/critical findings.
+
 ## C. Remaining release blockers
 
 ### Public source repository
