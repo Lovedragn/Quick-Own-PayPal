@@ -30,6 +30,7 @@ Thumbs.db
 Backend/*smoke*.json
 Backend/*diagnostic*.json
 Frontend/npm-audit.json
+Frontend/npm-audit-production.json
 Frontend/frontend-checks.txt
 **/coverage/
 **/playwright-report/
