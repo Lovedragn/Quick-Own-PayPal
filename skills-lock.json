@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "channel3-api": {
+      "source": "channel3-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/channel3-api/SKILL.md",
+      "computedHash": "ffc7ec0c8575a7f220cc805c106aacd14e9c73cd9f883a0f9c3cd069e9ad649d"
+    },
+    "elasticsearch-onboarding": {
+      "source": "elastic/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/elasticsearch/elasticsearch-onboarding/SKILL.md",
+      "computedHash": "cfea59892a5e39c730b775f7ed4dde13cbe4c9619cbc3421eab97db13ce7299e"
+    }
+  }
+}
