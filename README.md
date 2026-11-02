@@ -174,6 +174,11 @@ GitHub Actions runs backend tests on Java 21 and frontend ESLint/production-buil
 
 GitHub Actions run #1 for commit ea5f590 passed both jobs: Java 21 backend verification and Node 22 frontend lint/production build. The production dependency audit reports zero vulnerabilities; the development-only audit reports moderate ESLint-chain advisories and no high or critical findings.
 
+## Development standards and quality review
+
+- [Contributing and coding standards](CONTRIBUTING.md)
+- [Project quality and hackathon compliance audit](PROJECT_QUALITY_AUDIT.md)
+
 ## API overview
 
 | Method | Endpoint | Purpose |
