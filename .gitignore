@@ -1,0 +1,7 @@
+.env
+.env*
+.intelligence.env
+.vscode/
+.run/
+**/target/
+**/.idea/

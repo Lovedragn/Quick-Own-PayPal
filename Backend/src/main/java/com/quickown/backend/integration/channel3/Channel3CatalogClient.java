@@ -107,10 +107,11 @@ public class Channel3CatalogClient {
       return null;
     }
 
-    String brand = readBrand(product.path("brand"));
+    String brand = readBrand(product);
     String category =
         firstNonBlank(
             text(product, "category"),
+            text(product.path("category"), "title"),
             text(product.path("category"), "name"),
             text(product, "category_name"));
     String description = text(product, "description");
@@ -154,6 +155,7 @@ public class Channel3CatalogClient {
     String merchant =
         firstNonBlank(
             text(offer, "merchant_domain"),
+            text(offer, "domain"),
             text(offer.path("merchant"), "domain"),
             text(offer.path("merchant"), "name"),
             text(offer, "merchant_name"),
@@ -192,11 +194,24 @@ public class Channel3CatalogClient {
     return null;
   }
 
-  private String readBrand(JsonNode brandNode) {
+  private String readBrand(JsonNode product) {
+    JsonNode brandNode = product.path("brand");
     if (brandNode.isTextual()) {
       return brandNode.asText();
     }
-    return firstNonBlank(text(brandNode, "name"), text(brandNode, "title"));
+    String brandFromObject = firstNonBlank(text(brandNode, "name"), text(brandNode, "title"));
+    if (brandFromObject != null) {
+      return brandFromObject;
+    }
+    JsonNode brandsNode = product.path("brands");
+    if (brandsNode.isArray() && !brandsNode.isEmpty()) {
+      JsonNode first = brandsNode.get(0);
+      if (first.isTextual()) {
+        return first.asText();
+      }
+      return firstNonBlank(text(first, "name"), text(first, "title"));
+    }
+    return null;
   }
 
   private String firstImageUrl(JsonNode images) {

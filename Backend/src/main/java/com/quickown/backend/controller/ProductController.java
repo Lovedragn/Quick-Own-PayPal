@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** REST endpoints for product discovery and catalogue search. */
 @RestController
-@RequestMapping("/api/products")
+@RequestMapping({"/api/products", "/api/channel3/products"})
 public class ProductController {
 
   private final ProductCatalogService productCatalogService;
