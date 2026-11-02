@@ -16,9 +16,28 @@ npm install @paypal/paypal-js
 
 # HTTP Client for backend communication
 npm install axios
+
+# Channel3 SDK for universal product catalog & AI agent shopping
+npm install @channel3/sdk
 ```
 
-### 1.2 Install Hackathon Partner & Agent Libraries
+### 1.2 Install Channel3 & Elasticsearch Agent Skills
+
+Install the official Channel3 and Elasticsearch onboarding agent skills locally into your project (or globally across your machine):
+
+```bash
+# Install Channel3 API skill
+npx skills add channel3-ai/skills --skill channel3-api
+
+# Install Elasticsearch Onboarding skill
+npx skills add elastic/agent-skills --skill elasticsearch-onboarding -y
+
+# (Optional) Install skills globally across your system
+npx skills add channel3-ai/skills --skill channel3-api -g
+npx skills add elastic/agent-skills --skill elasticsearch-onboarding -y -g
+```
+
+### 1.3 Install Hackathon Partner & Agent Libraries
 
 ```bash
 # APIMatic context & schema toolkit
@@ -29,9 +48,12 @@ npm install ai @ai-sdk/openai @modelcontextprotocol/sdk
 
 # Optional UI sponsor components (AG Grid & Bryntum)
 npm install ag-grid-react ag-grid-community
+
+# Elasticsearch official Node.js / TypeScript SDK
+npm install @elastic/elasticsearch
 ```
 
-### 1.3 Frontend Environment Configuration (`.env.local`)
+### 1.4 Frontend Environment Configuration (`.env.local`)
 
 ```env
 # PayPal Credentials
@@ -40,7 +62,8 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 
 # Hackathon Sponsor API Keys
 APIMATIC_API_KEY=your_apimatic_api_key
-CHANNEL3_API_KEY=your_channel3_api_key
+CHANNELV3_SECRET=your_channel3_api_key_from_root_env
+CHANNEL3_API_KEY=your_channel3_api_key_from_root_env
 OPENAI_API_KEY=your_openai_or_gemini_api_key
 ```
 
@@ -164,9 +187,9 @@ paypal.client-id=your_paypal_sandbox_client_id
 paypal.client-secret=your_paypal_sandbox_secret
 paypal.base-url=https://api-m.sandbox.paypal.com
 
-# Channel3 Catalog API
-channel3.api-key=your_channel3_api_key
-channel3.base-url=https://api.channel3.com/v1
+# Channel3 Catalog API (Reads CHANNELV3_SECRET from environment variable)
+channel3.api-key=${CHANNELV3_SECRET:}
+channel3.base-url=https://api.trychannel3.com
 
 # Elastic Hybrid / Vector Search
 elastic.endpoint=your_elastic_cloud_endpoint
@@ -256,6 +279,92 @@ public class PayPalAuthService {
     }
 }
 ```
+
+### 3.5 Elasticsearch SDK Setup & Connection Configuration
+
+Based on Elastic's official documentation ([Connect with an SDK](https://www.elastic.co/docs/solutions/search/set-up/connect-with-an-sdk)), connection requires your Elasticsearch **endpoint URL** (or Cloud ID) and an **API key**.
+
+#### 3.5.1 Java Client Configuration (`ElasticsearchConfig.java`)
+
+Create `src/main/java/com/quickown/backend/Config/ElasticsearchConfig.java`:
+
+```java
+package com.quickown.backend.Config;
+
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.json.jackson.JacksonJsonpMapper;
+import co.elastic.clients.transport.ElasticsearchTransport;
+import co.elastic.clients.transport.rest_client.RestClientTransport;
+import org.apache.http.Header;
+import org.apache.http.HttpHost;
+import org.apache.http.message.BasicHeader;
+import org.elasticsearch.client.RestClient;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Configuration
+public class ElasticsearchConfig {
+
+    @Value("${elastic.endpoint:http://localhost:9200}")
+    private String endpoint;
+
+    @Value("${elastic.api-key:}")
+    private String apiKey;
+
+    @Bean
+    public ElasticsearchClient elasticsearchClient() {
+        List<Header> defaultHeaders = new ArrayList<>();
+        if (apiKey != null && !apiKey.isBlank()) {
+            defaultHeaders.add(new BasicHeader("Authorization", "ApiKey " + apiKey));
+        }
+
+        RestClient restClient = RestClient.builder(HttpHost.create(endpoint))
+                .setDefaultHeaders(defaultHeaders.toArray(new Header[0]))
+                .build();
+
+        ElasticsearchTransport transport = new RestClientTransport(
+                restClient,
+                new JacksonJsonpMapper()
+        );
+
+        return new ElasticsearchClient(transport);
+    }
+}
+```
+
+#### 3.5.2 Next.js / Node.js Client (`lib/elasticsearch.js`)
+
+In `frontend/src/lib/elasticsearch.js`:
+
+```javascript
+import { Client } from '@elastic/elasticsearch';
+
+const client = new Client({
+  node: process.env.ELASTIC_ENDPOINT || 'http://localhost:9200',
+  auth: {
+    apiKey: process.env.ELASTIC_API_KEY,
+  },
+});
+
+export default client;
+```
+
+#### 3.5.3 Elasticsearch Onboarding & Developer Agent Skill
+
+To guide search architecture, index mapping, vector/hybrid search, and RAG pipelines interactively:
+
+```bash
+# Add Elasticsearch onboarding skill
+npx skills add elastic/agent-skills --skill elasticsearch-onboarding -y
+```
+
+Trigger it in chat using:
+- `/elasticsearch-onboarding`
+- Or prompt: `"Help me design the Elasticsearch schema and vector search for my products"`
 
 ---
 
