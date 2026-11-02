@@ -1,6 +1,7 @@
 package com.quickown.backend.exception;
 
 import com.quickown.backend.dto.ApiErrorResponse;
+import com.quickown.backend.exception.CatalogProviderException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
@@ -14,6 +15,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -53,6 +55,17 @@ public class GlobalExceptionHandler {
         HttpStatus.BAD_GATEWAY.value(), "PAYPAL_API_ERROR", exception.getMessage(), request);
   }
 
+  @ExceptionHandler(CatalogProviderException.class)
+  public ResponseEntity<ApiErrorResponse> handleCatalogProviders(
+      CatalogProviderException exception, HttpServletRequest request) {
+    LOGGER.warn("All configured catalogue providers failed: {}", exception.getMessage());
+    return response(
+        HttpStatus.BAD_GATEWAY.value(),
+        "CATALOG_PROVIDERS_UNAVAILABLE",
+        "All configured product catalogue providers are temporarily unavailable.",
+        request);
+  }
+
   @ExceptionHandler(Channel3ApiException.class)
   public ResponseEntity<ApiErrorResponse> handleChannel3Api(
       Channel3ApiException exception, HttpServletRequest request) {
@@ -90,6 +103,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler({
     HttpMessageNotReadableException.class,
     MissingServletRequestParameterException.class,
+    MissingRequestHeaderException.class,
     MethodArgumentTypeMismatchException.class
   })
   public ResponseEntity<ApiErrorResponse> handleMalformedRequest(

@@ -19,12 +19,19 @@ public class ProductController {
     this.productCatalogService = productCatalogService;
   }
 
+  /** Backwards-compatible direct-call overload used by existing controller tests. */
+  public List<ProductResult> searchProducts(String query, boolean inStockOnly) {
+    return searchProducts(query, inStockOnly, null);
+  }
+
   @GetMapping("/search")
   public List<ProductResult> searchProducts(
-      @RequestParam String query, @RequestParam(defaultValue = "false") boolean inStockOnly) {
+      @RequestParam String query,
+      @RequestParam(defaultValue = "false") boolean inStockOnly,
+      @RequestParam(required = false) String currency) {
     if (query == null || query.isBlank() || query.length() > 250) {
       throw new IllegalArgumentException("query must contain 1-250 characters.");
     }
-    return productCatalogService.search(query, inStockOnly);
+    return productCatalogService.search(query, inStockOnly, currency);
   }
 }

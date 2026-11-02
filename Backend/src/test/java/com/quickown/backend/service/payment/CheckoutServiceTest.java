@@ -2,6 +2,7 @@ package com.quickown.backend.service.payment;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,18 +19,24 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class CheckoutServiceTest {
 
   private final ObjectMapper mapper = new ObjectMapper();
   private HttpServer server;
   private CheckoutService checkoutService;
+  private ProductCatalogService productCatalogService;
+  private PayPalOrdersClient paypalOrdersClient;
+  private Path storageFile;
+  @TempDir Path tempDir;
   private String baseUrl;
 
   private final AtomicInteger channel3SearchCalls = new AtomicInteger();
@@ -57,17 +64,17 @@ class CheckoutServiceTest {
     Channel3CatalogClient channel3 = new Channel3CatalogClient("test-channel3-key", baseUrl);
     PayPalAuthService auth =
         new PayPalAuthService("test-paypal-client-id", "test-paypal-client-secret", baseUrl);
-    PayPalOrdersClient orders = new PayPalOrdersClient(auth, baseUrl);
-
-    ProductCatalogService productCatalogService =
-        new ProductCatalogService(channel3, new MockProductCatalog());
+    paypalOrdersClient = new PayPalOrdersClient(auth, baseUrl);
+    productCatalogService = new ProductCatalogService(channel3, new MockProductCatalog());
+    storageFile = tempDir.resolve("checkout-sessions.json");
     checkoutService =
         new CheckoutService(
             productCatalogService,
-            orders,
+            paypalOrdersClient,
             "Quick-Own Test",
             "http://localhost:3000/checkout/success",
-            "http://localhost:3000/checkout/cancel");
+            "http://localhost:3000/checkout/cancel",
+            storageFile);
   }
 
   @AfterEach
@@ -103,6 +110,17 @@ class CheckoutServiceTest {
 
     JsonNode createBody = receivedCreateBody.get();
     assertEquals("CAPTURE", createBody.path("intent").asText());
+    assertEquals(
+        false, createBody.path("purchase_units").get(0).path("custom_id").asText().isBlank());
+    JsonNode paypalExperience =
+        createBody.path("payment_source").path("paypal").path("experience_context");
+    assertEquals("Quick-Own Test", paypalExperience.path("brand_name").asText());
+    assertEquals("LOGIN", paypalExperience.path("landing_page").asText());
+    assertEquals("PAY_NOW", paypalExperience.path("user_action").asText());
+    assertEquals(
+        "http://localhost:3000/checkout/success", paypalExperience.path("return_url").asText());
+    assertEquals(
+        "http://localhost:3000/checkout/cancel", paypalExperience.path("cancel_url").asText());
     assertEquals(
         "USD",
         createBody.path("purchase_units").get(0).path("amount").path("currency_code").asText());
@@ -164,6 +182,91 @@ class CheckoutServiceTest {
   }
 
   @Test
+  void restoresPendingCheckoutAndIdempotencyAfterBackendRestart() {
+    var request =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem("channel3-bose-001", "Bose QC Earbuds", "shop.example.com", 2)));
+
+    var created = checkoutService.createOrder(request, "checkout-persist-restart-001");
+
+    // A new service instance represents a backend restart reading the same local state file.
+    CheckoutService restartedService =
+        new CheckoutService(
+            productCatalogService,
+            paypalOrdersClient,
+            "Quick-Own Test",
+            "http://localhost:3000/checkout/success",
+            "http://localhost:3000/checkout/cancel",
+            storageFile);
+
+    var retried = restartedService.createOrder(request, "checkout-persist-restart-001");
+    assertEquals(created, retried);
+    assertEquals(1, paypalCreateCalls.get());
+
+    var captured = restartedService.captureOrder(created.orderId());
+    assertEquals("COMPLETED", captured.status());
+    assertEquals("CAPTURE123", captured.captureId());
+    assertEquals(1, paypalCaptureCalls.get());
+  }
+
+  @Test
+  void recoversCaptureWhenPayPalCompletedItBeforeBackendRestart() {
+    var request =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem("channel3-bose-001", "Bose QC Earbuds", "shop.example.com", 2)));
+    var created = checkoutService.createOrder(request, "checkout-reconcile-completed-001");
+
+    // Simulate PayPal completing capture just before the backend lost its previous process.
+    paypalApprovalStatus.set("COMPLETED");
+
+    CheckoutService restartedService =
+        new CheckoutService(
+            productCatalogService,
+            paypalOrdersClient,
+            "Quick-Own Test",
+            "http://localhost:3000/checkout/success",
+            "http://localhost:3000/checkout/cancel",
+            storageFile);
+    var recovered = restartedService.captureOrder(created.orderId());
+
+    assertEquals("COMPLETED", recovered.status());
+    assertEquals("CAPTURE123", recovered.captureId());
+    assertEquals("USD", recovered.currency());
+    assertEquals("358.00", recovered.total());
+    assertEquals(1, paypalGetCalls.get());
+    assertEquals(0, paypalCaptureCalls.get());
+  }
+
+  @Test
+  void webhookCaptureChecksAmountAndIsIdempotent() {
+    var request =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem("channel3-bose-001", "Bose QC Earbuds", "shop.example.com", 2)));
+    var created = checkoutService.createOrder(request, "checkout-webhook-record-001");
+
+    assertThrows(
+        CheckoutConflictException.class,
+        () ->
+            checkoutService.recordCompletedCapture(
+                created.orderId(), "CAPTURE123", "USD", "1.00"));
+
+    assertTrue(
+        checkoutService.recordCompletedCapture(
+            created.orderId(), "CAPTURE123", "USD", "358.00"));
+    assertTrue(
+        checkoutService.recordCompletedCapture(
+            created.orderId(), "CAPTURE123", "USD", "358.00"));
+    assertThrows(
+        CheckoutConflictException.class,
+        () ->
+            checkoutService.recordCompletedCapture(
+                created.orderId(), "DIFFERENT_CAPTURE", "USD", "358.00"));
+  }
+
+  @Test
   void rejectsCheckoutWhenSelectedMerchantOfferIsUnavailable() {
     var request =
         new CheckoutRequest(
@@ -175,6 +278,172 @@ class CheckoutServiceTest {
         IllegalArgumentException.class,
         () -> checkoutService.createOrder(request, "checkout-invalid-merchant"));
     assertEquals(0, paypalCreateCalls.get());
+  }
+
+  @Test
+  void refusesStatusLookupForAnOrderNotCreatedByThisBackend() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> checkoutService.getOrderStatus("EXTERNALORDER123"));
+    assertEquals(0, paypalGetCalls.get());
+  }
+
+  @Test
+  void rejectsMismatchedProductIdEvenWhenTheProductNameMatches() {
+    var request =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem(
+                    "different-product-id", "Bose QC Earbuds", "shop.example.com", 1)));
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> checkoutService.createOrder(request, "checkout-wrong-product-id"));
+    assertEquals(0, paypalCreateCalls.get());
+  }
+
+  @Test
+  void requiresSelectedOfferUrlWhenMerchantHasMultipleEligibleOffers() {
+    ProductCatalogService multiOfferCatalog =
+        new ProductCatalogService(
+            new Channel3CatalogClient("test-channel3-key", baseUrl), new MockProductCatalog()) {
+          @Override
+          public List<com.quickown.backend.dto.product.ProductResult> search(
+              String query, boolean inStockOnly, String currency) {
+            return List.of(
+                new com.quickown.backend.dto.product.ProductResult(
+                    "Channel3",
+                    "channel3-bose-001",
+                    "Bose QC Earbuds",
+                    "Bose",
+                    "Earbuds",
+                    "Wireless noise cancelling earbuds",
+                    "https://images.example/bose-qc.jpg",
+                    true,
+                    List.of(
+                        new com.quickown.backend.dto.product.ProductOffer(
+                            "shop.example.com",
+                            new java.math.BigDecimal("179.00"),
+                            "USD",
+                            "InStock",
+                            "https://shop.example.com/bose-qc?offer=low&aid=fresh"),
+                        new com.quickown.backend.dto.product.ProductOffer(
+                            "shop.example.com",
+                            new java.math.BigDecimal("199.00"),
+                            "USD",
+                            "InStock",
+                            "https://shop.example.com/bose-qc-premium?offer=high&aid=fresh"))));
+          }
+        };
+
+    CheckoutService multiOfferCheckout =
+        new CheckoutService(
+            multiOfferCatalog,
+            paypalOrdersClient,
+            "Quick-Own Test",
+            "http://localhost:3000/checkout/success",
+            "http://localhost:3000/checkout/cancel",
+            tempDir.resolve("checkout-multiple-offers.json"));
+
+    var ambiguousRequest =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem(
+                    "channel3-bose-001", "Bose QC Earbuds", "shop.example.com", 1)));
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> multiOfferCheckout.createOrder(ambiguousRequest, "checkout-ambiguous-offer"));
+    assertEquals(0, paypalCreateCalls.get());
+
+    var selectedRequest =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem(
+                    "channel3-bose-001",
+                    "Bose QC Earbuds",
+                    "shop.example.com",
+                    1,
+                    "https://shop.example.com/bose-qc-premium?offer=high&aid=original")));
+
+    var created = multiOfferCheckout.createOrder(selectedRequest, "checkout-selected-offer");
+
+    assertEquals("199.00", created.total());
+    assertEquals(1, paypalCreateCalls.get());
+
+    var changedOfferSameKey =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem(
+                    "channel3-bose-001",
+                    "Bose QC Earbuds",
+                    "shop.example.com",
+                    1,
+                    "https://shop.example.com/bose-qc?offer=low&aid=original")));
+
+    assertThrows(
+        CheckoutConflictException.class,
+        () -> multiOfferCheckout.createOrder(changedOfferSameKey, "checkout-selected-offer"));
+    assertEquals(1, paypalCreateCalls.get());
+  }
+
+  @Test
+  void rejectsCheckoutItemsWithoutProductIdBeforeCallingPayPal() {
+    var request =
+        new CheckoutRequest(
+            List.of(new CheckoutItem(null, "Bose QC Earbuds", "shop.example.com", 1)));
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> checkoutService.createOrder(request, "checkout-no-product-id"));
+    assertEquals(0, paypalCreateCalls.get());
+  }
+
+  @Test
+  void rejectsMissingIdempotencyKeyBeforeCallingPayPal() {
+    var request =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem("channel3-bose-001", "Bose QC Earbuds", "shop.example.com", 1)));
+
+    assertThrows(IllegalArgumentException.class, () -> checkoutService.createOrder(request, null));
+    assertEquals(0, paypalCreateCalls.get());
+  }
+
+  @Test
+  void readsPayPalApprovalStatusWithoutCapturingTheOrder() throws Exception {
+    var request =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem("channel3-bose-001", "Bose QC Earbuds", "shop.example.com", 2)));
+    var created = checkoutService.createOrder(request, "checkout-read-status-001");
+
+    var status = checkoutService.getOrderStatus(created.orderId());
+
+    assertEquals("PAYPALORDER123", status.orderId());
+    assertEquals("APPROVED", status.status());
+    assertEquals("USD", status.currency());
+    assertEquals("358.00", status.total());
+    assertEquals(true, status.buyerApproved());
+    assertEquals(0, paypalCaptureCalls.get());
+  }
+
+  @Test
+  void reportsBuyerApprovedWhenPayPalOrderIsAlreadyCompleted() {
+    var request =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem("channel3-bose-001", "Bose QC Earbuds", "shop.example.com", 2)));
+    var created = checkoutService.createOrder(request, "checkout-status-completed-001");
+    paypalApprovalStatus.set("COMPLETED");
+
+    var status = checkoutService.getOrderStatus(created.orderId());
+
+    assertEquals("COMPLETED", status.status());
+    assertEquals("USD", status.currency());
+    assertEquals("358.00", status.total());
+    assertEquals(true, status.buyerApproved());
+    assertEquals(0, paypalCaptureCalls.get());
   }
 
   @Test
@@ -305,6 +574,19 @@ class CheckoutServiceTest {
     if ("/v2/checkout/orders/PAYPALORDER123".equals(path)
         && "GET".equals(exchange.getRequestMethod())) {
       paypalGetCalls.incrementAndGet();
+      String capturedDetails =
+          "COMPLETED".equalsIgnoreCase(paypalApprovalStatus.get())
+              ? """
+                ,"payments":{"captures":[
+                  {
+                    "id":"CAPTURE123",
+                    "status":"COMPLETED",
+                    "amount":{"currency_code":"USD","value":"%s"}
+                  }
+                ]}
+                """
+                  .formatted(paypalCapturedAmount.get())
+              : "";
       String approvedOrderBody =
           """
           {
@@ -316,11 +598,13 @@ class CheckoutServiceTest {
                   "currency_code": "USD",
                   "value": "%s"
                 }
+                %s
               }
             ]
           }
           """
-              .formatted(paypalApprovalStatus.get(), paypalApprovedAmount.get());
+              .formatted(
+                  paypalApprovalStatus.get(), paypalApprovedAmount.get(), capturedDetails);
       respond(exchange, 200, approvedOrderBody);
       return;
     }

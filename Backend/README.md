@@ -1,147 +1,141 @@
-# Quick-Own PayPal Backend
+# Quick-Own Backend
 
-AI-powered PayPal shopping assistant using Java 21, Spring Boot 4, Spring AI, Gemini, Channel3 and PayPal Orders v2.
+Spring Boot backend for Quick-Own, an AI-assisted agentic shopping prototype using Java 21, Spring AI, Google Gemini, Channel3 and PayPal Orders v2 Sandbox.
+
+For the full product overview and local run instructions, see the root [README](../README.md).
 
 ## Architecture
 
-```text
-com.quickown.backend
-├── ai
-│   └── tool                 # Spring AI function tools
-├── catalog                  # Local mock catalogue and search
-├── config                   # CORS and infrastructure configuration
-├── controller               # Thin REST controllers
-├── dto
-│   ├── ai                   # AI request/response records
-│   ├── checkout             # Checkout request/response records
-│   └── product              # Normalized product and offer records
-├── exception                # Typed exceptions + GlobalExceptionHandler
-├── integration
-│   ├── channel3             # Channel3 API client
-│   └── paypal               # PayPal OAuth and Orders API clients
-└── service
-    ├── ai                   # AI shopping orchestration
-    ├── catalog              # Catalogue provider selection
-    └── payment              # Checkout and capture use case
-```
+- `controller`: REST endpoints and request validation.
+- `service/ai`: Gemini shopping-intent interpretation and catalogue-backed recommendation orchestration.
+- `service/catalog`: provider orchestration, currency selection and product-offer aggregation.
+- `service/payment`: server-side cart repricing, PayPal order creation, capture, state persistence and recovery.
+- `integration/channel3`: Channel3 product catalogue client.
+- `integration/retailer`: optional Flipkart Affiliate and Amazon.in Creators API clients.
+- `integration/paypal`: OAuth 2.0, PayPal Orders v2 and webhook-signature verification clients.
+- `dto`: API request and response records.
+- `exception`: typed integration errors and centralized REST error mapping.
 
-### Layer rules
+## Environment variables
 
-- Controllers bind and validate HTTP requests, delegate to services and return DTOs.
-- Services implement application use cases and must not construct HTTP error responses.
-- Integration clients own provider HTTP details and map external payloads to internal DTOs.
-- AI tools delegate to application services; they should not contain catalogue or payment business logic.
-- All API exception mapping belongs in `exception/GlobalExceptionHandler` (`@RestControllerAdvice`).
-- API request and response models live in `dto`, never nested inside controllers or services.
-
-See `CODING_STANDARDS.md` for the team's conventions.
-
-## Environment configuration
-
-Configure these variables in the IntelliJ `BackendApplication` run configuration. Do not put secrets in source files or commit them.
+Configure these values in the IntelliJ `BackendApplication` run configuration or in the process that starts Spring Boot. Never put secret values in source files or commit them.
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `GEMINI_API_KEY` | Yes | Gemini shopping assistant |
-| `CHANNEL3_API_KEY` | Yes for live catalogue | Channel3 product discovery |
+| `GEMINI_API_KEY` | Yes for AI recommendations | Gemini API key used by Spring AI |
+| `CHANNEL3_API_KEY` | Yes for live product discovery | Channel3 catalogue API key |
 | `PAYPAL_CLIENT_ID` | Yes for checkout | PayPal Sandbox REST app client ID |
 | `PAYPAL_CLIENT_SECRET` | Yes for checkout | PayPal Sandbox REST app secret |
 | `PAYPAL_BASE_URL` | No | Defaults to `https://api-m.sandbox.paypal.com` |
 | `PAYPAL_RETURN_URL` | No | Defaults to `http://localhost:3000/checkout/success` |
-| `PAYPAL_CANCEL_URL` | No | Defaults to `http://localhost:3000/checkout/cancel` |
-| `FRONTEND_ORIGIN` | No | Defaults to `http://localhost:3000` for local Next.js CORS |
+| `PAYPAL_CANCEL_URL` | No | Defaults to `http://localhost:3000/checkout/cancelled` |
+| `PAYPAL_WEBHOOK_ID` | Optional | Webhook ID from the same Sandbox REST app |
+| `FRONTEND_ORIGINS` | No | Exact comma-separated CORS origins; localhost:3000 and 127.0.0.1:3000 are allowed by default |
+| `CATALOG_CURRENCY` | No | Defaults to INR |
+| `CATALOG_FALLBACK_CURRENCY` | No | Defaults to USD; only used for unbudgeted searches when the preferred market returns no products |
+| `FLIPKART_AFFILIATE_ID` | Optional | Flipkart Affiliate tracking ID |
+| `FLIPKART_AFFILIATE_TOKEN` | Optional | Flipkart Affiliate API token |
+| `AMAZON_CREATORS_CLIENT_ID` | Optional | Amazon.in Creators API client ID |
+| `AMAZON_CREATORS_CLIENT_SECRET` | Optional | Amazon.in Creators API client secret |
+| `AMAZON_ASSOCIATES_PARTNER_TAG` | Optional | Amazon.in Associates Partner Tag |
 
-PayPal uses OAuth 2.0 client credentials. The backend obtains and caches access tokens. The client secret and access token are never returned to the frontend.
+The Windows helper `configure-retailer-credentials.ps1` prompts for optional Affiliate/Creators credentials locally. It cannot create or approve affiliate accounts. Leave credentials blank for providers that are not yet available.
 
-## Run and test
+## Run
 
-Run `BackendApplication` from IntelliJ on port 8080.
+From IntelliJ, run `BackendApplication` on port 8080.
 
-Run all tests:
+Or use PowerShell:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+Run the automated regression suite:
 
 ```powershell
 .\mvnw.cmd clean test
 ```
 
-The tests use local HTTP test servers. They do not create real PayPal orders, move money, or consume Channel3 search quota.
-
-Format Java sources and tests with Google Java Format 1.24.0.
+The tests use local HTTP test servers and mocked provider responses. They do not create real PayPal orders, move money or consume live Channel3 quota.
 
 ## API endpoints
 
-### 1. Structured product search
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/health` | Health check |
+| GET | `/api/catalog/providers` | Shows whether catalogue providers are configured, without returning credentials |
+| GET | `/api/products/search` | Structured catalogue search |
+| POST | `/api/ai/recommendations` | Natural-language intent interpretation and ranked product recommendations |
+| POST | `/api/checkout/orders` | Revalidate exact offer and create PayPal Sandbox order |
+| GET | `/api/checkout/orders/{orderId}/status` | Read status for a locally owned order |
+| POST | `/api/checkout/orders/{orderId}/capture` | Verify approval, capture or reconcile the order |
+| POST | `/api/paypal/webhooks` | Verify and process supported PayPal webhook events |
 
-`GET /api/products/search?query=wireless%20earbuds&inStockOnly=true`
+### AI recommendations
 
-Returns structured product cards, product IDs, images and merchant offers for the frontend. `inStockOnly` is optional and defaults to `false`.
-
-### 2. AI product discovery
-
-`POST /api/ai/test`
-
-Request:
+`POST /api/ai/recommendations`
 
 ```json
 {
-  "message": "Find wireless noise cancelling earbuds under $200."
+  "message": "Find wireless noise-cancelling headphones under ₹6000 with long battery life"
 }
 ```
 
-### 3. Create a PayPal order
+Gemini interprets the shopping request. The backend independently applies budget/currency/stock constraints, searches configured catalogue providers, filters offers and ranks catalogue-backed products. Product facts, stock, prices and merchant URLs are not invented by the model.
 
-`POST /api/checkout/orders`
+### PayPal checkout
 
-Send a unique `Idempotency-Key` header for each cart attempt. Reuse the same key only when retrying the exact same cart after a network failure.
+`POST /api/checkout/orders` requires a unique `Idempotency-Key` header for every new cart. Reuse that key only for a retry of the identical cart. Reusing a key with a changed cart is rejected.
 
-`Idempotency-Key: quickown-demo-001`
-
-Request body:
+```http
+Idempotency-Key: quickown-demo-001
+Content-Type: application/json
+```
 
 ```json
 {
   "items": [
     {
-      "productId": "CHANNEL3_PRODUCT_ID",
-      "productName": "Exact product title from search results",
-      "merchantDomain": "merchant-value-from-selected-offer",
-      "quantity": 1
+      "productId": "PRODUCT_ID_FROM_SEARCH",
+      "productName": "Exact catalogue product title",
+      "merchantDomain": "merchant-from-selected-offer",
+      "quantity": 1,
+      "offerUrl": "exact-productUrl-from-selected-offer"
     }
   ]
 }
 ```
 
-Use the exact `productId`, `productName`, and selected offer's `merchant` from the structured product-search response. The backend re-searches Channel3 and validates the exact product, selected merchant, current availability and current price. It does not accept a client-supplied price. All items in one PayPal order must use the same currency.
+The client does not provide a price. The backend re-fetches the configured catalogue, validates product ID and title, the selected merchant and offer URL, stock and current price, then calculates the PayPal total. If a merchant has multiple eligible offers, `offerUrl` is required to identify the chosen price. All items in one PayPal order must use the same currency.
 
-Successful response includes the PayPal `orderId`, buyer `approvalUrl`, server-calculated `currency` and `total`, and validated line items.
+The backend returns the PayPal order ID and approval URL. The browser redirects the buyer to PayPal Sandbox. PayPal returns to the frontend success page, which calls `POST /api/checkout/orders/{orderId}/capture`. The backend verifies that the order is approved and that PayPal's amount and currency match the server-calculated total before capture.
 
-### 4. Capture an approved PayPal order
+Capture is idempotent. If PayPal completed a capture immediately before a backend restart, the service reconciles the completed PayPal order instead of attempting another capture.
 
-After the buyer approves the order at PayPal, PayPal redirects to the configured return URL. The `token` query parameter on that redirect is the PayPal order ID.
+## Catalogue providers
 
-Call:
+- **Channel3** is the currently active live catalogue provider.
+- **Flipkart Affiliate** is optional and requires an Affiliate account plus API credentials.
+- **Amazon.in Creators API** is optional and requires an eligible Associates account plus approved API access and credentials.
 
-`POST /api/checkout/orders/{orderId}/capture`
+Providers fail independently so one unavailable retailer does not prevent successful providers from returning results. INR is the default market. No currency conversion is performed. An unbudgeted search may retry using the configured fallback currency only when the preferred market has no results, and the response discloses that fallback. An explicit INR budget never falls back to USD.
 
-The backend fetches the PayPal order, verifies that its status is `APPROVED`, checks the approved amount and currency against the server-calculated cart, captures the payment, and validates the completed capture amount and currency. Duplicate capture requests return the previously recorded result.
+Channel3 merchant offers must be displayed as Channel3-returned offers; they must not be represented as Amazon or Flipkart offers unless those providers actually returned them.
 
-## Manual PayPal Sandbox test
+## PayPal webhooks
 
-1. In the PayPal Developer Dashboard, create or select a REST API app in the Sandbox environment.
-2. Copy its Sandbox Client ID and Secret into `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` in IntelliJ's run configuration.
-3. Keep `PAYPAL_BASE_URL` set to `https://api-m.sandbox.paypal.com`.
-4. Restart `BackendApplication`.
-5. Call the structured product search endpoint and select an in-stock product and one of its offers.
-6. Call `POST /api/checkout/orders` with that product ID, exact product name, selected offer merchant value, quantity and a unique `Idempotency-Key`.
-7. Open the returned `approvalUrl` in a browser and sign in with a PayPal Personal Sandbox buyer account (not the business seller account). Approve the payment.
-8. Read the `token` query parameter from the PayPal return URL and call `POST /api/checkout/orders/{token}/capture`.
-9. Confirm the response reports `COMPLETED` and includes the capture ID.
+`POST /api/paypal/webhooks` verifies the PayPal transmission signature before processing any event. Configure `PAYPAL_WEBHOOK_ID` and register the endpoint over public HTTPS. Supported events include:
 
-Never use live PayPal credentials or a live account for this hackathon test.
+- `CHECKOUT.ORDER.APPROVED`: attempts server-side capture for a locally created order.
+- `PAYMENT.CAPTURE.COMPLETED`: reconciles capture ID, amount and currency.
+- `CHECKOUT.ORDER.COMPLETED`: reconciles the completed order capture.
 
-## MVP limitations
+A local `localhost` listener is not reachable by PayPal. Use an HTTPS tunnel for local webhook testing.
 
-- Checkout state and idempotency records are held in memory. Do not restart the backend between order creation and capture. A persistent database is needed for multi-instance or production deployment.
-- The current MVP supports one currency per PayPal order.
-- Product prices and stock are revalidated against Channel3 immediately before order creation. Offer expiry and fulfillment state need explicit production handling.
-- Webhook signature verification and durable order reconciliation should be added before production use.
-- Configure the frontend return/cancel URLs for the actual deployed frontend before deployment.
+## MVP limitations and payment disclosure
+
+- Checkout state and idempotency records are persisted to a local JSON file for a single-instance hackathon MVP. Use a transactional shared database before multi-instance or production deployment.
+- PayPal capture is a Sandbox payment to the Quick-Own Sandbox merchant. It does not place an order with Amazon, Flipkart or a Channel3 merchant, and does not guarantee retailer fulfilment.
+- Product prices and stock are revalidated before order creation, but production systems need explicit offer-expiry and retailer-fulfilment handling.
+- Use only PayPal Sandbox credentials for this hackathon demonstration.

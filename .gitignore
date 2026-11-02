@@ -1,7 +1,37 @@
+# Local secrets and environment files
 .env
-.env*
-.intelligence.env
-.vscode/
-.run/
-**/target/
+.env.*
+!.env.example
+!.env.local.example
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.local.example
+
+# Dependencies and build outputs
+**/node_modules/
+**/.next/
+**/out/
+**/build/
+Backend/target/
+Backend/data/
+
+# IDE and OS files
+.idea/
 **/.idea/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+Thumbs.db
+
+# Local logs and test output
+*.log
+Backend/*smoke*.json
+Backend/*diagnostic*.json
+Frontend/npm-audit.json
+Frontend/npm-audit-production.json
+Frontend/frontend-checks.txt
+**/coverage/
+**/playwright-report/
+**/test-results/
