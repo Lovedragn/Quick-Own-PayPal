@@ -86,9 +86,9 @@ Add the publicly accessible YouTube URL here only after recording and checking t
 
 ## Public source repository
 
-Add the final public repository URL after the latest source folder has been synchronized and the root-level license has been agreed and published:
+The complete working source has been synchronized to the public Prapitesh branch. The root-level license is still pending contributor approval and must be resolved before final submission:
 
-**Repository:** _to be verified after release sync_
+**Public repository:** https://github.com/Lovedragn/Quick-Own-PayPal/tree/Prapitesh
 
 ## Final submission checks
 

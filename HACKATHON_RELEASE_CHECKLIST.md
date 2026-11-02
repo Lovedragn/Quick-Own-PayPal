@@ -10,7 +10,7 @@ This checklist separates the hackathon requirements from optional quality improv
 | Meaningful AI use | Gemini via Spring AI interprets natural-language intent | **Implemented**; live recommendation request verified |
 | Working prototype | Next.js UI, Spring Boot API, Channel3 catalogue and PayPal Sandbox order creation | **Implemented locally**; final browser/payment rehearsal pending |
 | Documentation | Root, backend and frontend READMEs with environment and setup guidance | **Drafted locally**; validate from a clean checkout |
-| Public source repository | Existing public GitHub repository exists, but it is not the same folder as this active source tree | **Not synchronized** |
+| Public source repository | Exact working-folder source and submission materials pushed to the public "Prapitesh" branch | **Synced** |
 | Public open-source license | No root-level LICENSE exists in the working folder | **Blocked** until all contributors agree on licensing |
 | Functional demo or run instructions | Local setup instructions are in the root README; no hosted demo URL yet | **Local run path documented**; clean-clone verification pending |
 | Tools used explained | Root README and Devpost draft identify Gemini, Spring AI, Channel3, PayPal, Next.js and Java | **Drafted**; publish with final submission |
@@ -36,9 +36,9 @@ This checklist separates the hackathon requirements from optional quality improv
 ## C. Remaining release blockers
 
 ### Public source repository
-- [ ] Synchronize the exact `Quick-Own-PayPal-main/Quick-Own-PayPal-main` source folder to the intended public GitHub repository.
-- [ ] Confirm no `.env`, API secret, PayPal client secret, IntelliJ workspace file, local checkout JSON or test artifact is included.
-- [ ] Keep `Backend/target`, `Backend/data`, `Frontend/node_modules`, `Frontend/.next` and local logs out of Git.
+- [x] Synchronize the exact `Quick-Own-PayPal-main/Quick-Own-PayPal-main` source folder to the public "Prapitesh" branch.
+- [x] Confirm no `.env`, API secret, PayPal client secret, IntelliJ workspace file, local checkout JSON or test artifact is included in the pushed changes.
+- [x] Keep `Backend/target`, `Backend/data`, `Frontend/node_modules`, `Frontend/.next` and local logs out of Git.
 - [ ] Add a root-level license only after all contributors confirm they have the rights to license their contributions.
 - [ ] Confirm repository visibility is Public and the About section displays the selected license.
 - [ ] Verify README links and setup commands from a fresh clone.

@@ -117,7 +117,7 @@ In IntelliJ, open the `Backend` directory and run `BackendApplication` with the 
 
 ```powershell
 cd Backend
-.\\mvnw.cmd spring-boot:run
+.\mvnw.cmd spring-boot:run
 ```
 
 Backend health check:
@@ -150,7 +150,7 @@ Backend tests use local HTTP test servers and mocked provider responses. They do
 
 ```powershell
 cd Backend
-.\\mvnw.cmd clean test
+.\mvnw.cmd clean test
 ```
 
 The current working-folder test reports show **71 tests, 0 failures, 0 errors, 0 skipped**. Re-run the command after any code change and before publishing.
@@ -220,9 +220,9 @@ The client does not set the price. The backend calculates it from the current ca
 ## Hackathon submission checklist
 
 - [ ] Add a root-level open-source license after all contributors confirm they have the rights to license their contributions.
-- [ ] Publish this complete source tree, assets and run instructions to a public GitHub repository.
+- [x] Publish this complete source tree, assets and run instructions to the public GitHub Prapitesh branch: https://github.com/Lovedragn/Quick-Own-PayPal/tree/Prapitesh
 - [ ] Verify the repository About section displays the chosen license.
-- [ ] Run backend tests and frontend lint/build on the final commit.
+- [x] Run backend tests and frontend lint/build on the synchronized source (71/71 backend tests; frontend lint/build passed).
 - [ ] Test the user journey on the same browser/device used in the demo.
 - [ ] Record a public YouTube demo under three minutes, without unlicensed music or third-party copyrighted material.
 - [ ] Complete the Devpost text description, tools explanation, public repository URL, demo URL/instructions and YouTube link.
