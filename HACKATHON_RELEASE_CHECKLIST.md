@@ -6,14 +6,14 @@ This checklist separates the hackathon requirements from optional quality improv
 
 | Requirement from Devpost | Current evidence | Status |
 |---|---|---|
-| Meaningful PayPal technology | PayPal Sandbox OAuth and Orders v2; order creation, approval status, capture and recovery | **Implemented**; buyer approval/capture rehearsal still required |
+| Meaningful PayPal technology | PayPal Sandbox OAuth and Orders v2; order creation, approval status, capture and recovery | **Verified**; Sandbox buyer approval and order status `COMPLETED` confirmed for USD 565.00 |
 | Meaningful AI use | Gemini via Spring AI interprets natural-language intent | **Implemented**; live recommendation request verified |
-| Working prototype | Next.js UI, Spring Boot API, Channel3 catalogue and PayPal Sandbox order creation | **Implemented locally**; final browser/payment rehearsal pending |
-| Documentation | Root, backend and frontend READMEs with environment and setup guidance | **Drafted locally**; validate from a clean checkout |
+| Working prototype | Next.js UI, Spring Boot API, Channel3 catalogue and PayPal Sandbox order creation | **Verified locally**; live AI search and PayPal Sandbox order completion confirmed; hosted demo remains pending |
+| Documentation | Root, backend and frontend READMEs with environment and setup guidance | **Published**; root, backend and frontend instructions and judge-facing materials pushed to the public branch |
 | Public source repository | Exact working-folder source and submission materials pushed to the public "Prapitesh" branch | **Synced** |
 | Public open-source license | No root-level LICENSE exists in the working folder | **Blocked** until all contributors agree on licensing |
 | Functional demo or run instructions | Local setup instructions are in the root README; no hosted demo URL yet | **Local run path documented**; clean-clone verification pending |
-| Tools used explained | Root README and Devpost draft identify Gemini, Spring AI, Channel3, PayPal, Next.js and Java | **Drafted**; publish with final submission |
+| Tools used explained | Root README and Devpost draft identify Gemini, Spring AI, Channel3, PayPal, Next.js and Java | **Published in repository draft**; paste and review in Devpost |
 | Demo video under 3 minutes | A timed 2:45 script exists in `DEMO_SCRIPT.md` | **Not recorded/uploaded** |
 | Public YouTube link | No final YouTube link yet | **Not complete** |
 | Official rules | Must be checked before submission, including eligibility and content permissions | **Participant confirmation required** |
@@ -28,10 +28,11 @@ This checklist separates the hackathon requirements from optional quality improv
 - [x] Catalogue provider endpoint reports Channel3 configured; optional Flipkart and Amazon.in are not configured.
 - [x] Gemini + Channel3 live recommendation returned an iPhone 16 product record, product ID, merchant, offer URL and USD price.
 - [x] PayPal Sandbox order creation succeeded for the selected iPhone 16 offer at USD 565.00.
-- [x] PayPal order status returned `PAYER_ACTION_REQUIRED` and `buyerApproved=false`; no capture was performed in the smoke test.
+- [x] PayPal Sandbox buyer approval completed; order-status endpoint subsequently returned `COMPLETED`, `buyerApproved=true`, total USD 565.00.
 - [x] Channel3's rotating `aid` attribution parameter is excluded from exact offer identity comparison; product path and offer identifier remain matched.
 - [x] Checkout retry key is retained for the same cart in the frontend; verify after final source changes.
 - [x] CORS preflight from `http://localhost:3000` returned 200 and allowed `content-type, idempotency-key`.
+- [x] GitHub Actions CI workflow added for Java 21 backend tests and Node 22 frontend lint/build.
 
 ## C. Remaining release blockers
 
@@ -44,10 +45,10 @@ This checklist separates the hackathon requirements from optional quality improv
 - [ ] Verify README links and setup commands from a fresh clone.
 
 ### End-to-end PayPal demonstration
-- [ ] Open the PayPal Sandbox approval URL with a Personal Sandbox buyer account.
-- [ ] Approve the order manually.
-- [ ] Verify the browser returns to `/checkout/success`.
-- [ ] Verify the capture page displays `COMPLETED`, the correct USD 565.00 amount and a capture ID.
+- [x] Open the PayPal Sandbox approval URL with a Personal Sandbox buyer account.
+- [x] Buyer approval confirmed by the backend order-status endpoint.
+- [ ] Verify the browser returns to `/checkout/success` and renders the completed receipt UI.
+- [ ] Verify the browser receipt UI displays `COMPLETED`, USD 565.00 and the capture ID. Backend order status currently reports `COMPLETED`.
 - [ ] Test a cancelled order and verify no capture occurs.
 - [ ] Verify retry does not create a second order or capture.
 - [ ] Do not use PayPal Live credentials.
@@ -77,4 +78,4 @@ This checklist separates the hackathon requirements from optional quality improv
 
 ## E. Release decision
 
-Do not submit until the public repository, root license, clean-clone instructions, buyer approval/capture rehearsal and YouTube video are complete. Passing tests is important evidence, but it does not substitute for the mandatory submission materials.
+Do not submit until the root license, fresh-clone run, receipt-page verification, YouTube video and Devpost form are complete. The PayPal Sandbox order has already reached `COMPLETED`. Passing tests is important evidence, but it does not substitute for the mandatory submission materials.

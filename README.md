@@ -164,6 +164,10 @@ npm run lint
 npm run build
 ```
 
+## Continuous integration
+
+GitHub Actions runs backend tests on Java 21 and frontend ESLint/production-build checks on pushes and pull requests targeting main or Prapitesh. See .github/workflows/ci.yml.
+
 ## API overview
 
 | Method | Endpoint | Purpose |
