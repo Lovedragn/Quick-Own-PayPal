@@ -178,6 +178,7 @@ GitHub Actions run #1 for commit ea5f590 passed both jobs: Java 21 backend verif
 
 - [Contributing and coding standards](CONTRIBUTING.md)
 - [Project quality and hackathon compliance audit](PROJECT_QUALITY_AUDIT.md)
+- [Frontend/backend API integration test report](API_INTEGRATION_TEST_REPORT.md)
 
 ## API overview
 
