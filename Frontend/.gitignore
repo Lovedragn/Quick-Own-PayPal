@@ -29,9 +29,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+npm-ci.log
 
-# env files (can opt-in for committing if needed)
+# environment files: local values stay private; safe templates may be committed
 .env*
+!.env.example
+!.env.local.example
 
 # vercel
 .vercel
