@@ -70,6 +70,9 @@ export default function ProductDetailOverlay({
   onCheckout,
   checkingOut = false,
   initialVariantIndex = 0,
+  isLiked = false,
+  onToggleLike,
+  onAddToCart,
 }) {
   const product = recommendation?.product;
   const offers = useMemo(() => getOffers(recommendation), [recommendation]);
@@ -79,8 +82,7 @@ export default function ProductDetailOverlay({
   const [selectedVariant, setSelectedVariant] = useState(initialVariantIndex);
   const [selectedSize, setSelectedSize] = useState("");
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [liked, setLiked] = useState(false);
-  const [compared, setCompared] = useState(false);
+    const [compared, setCompared] = useState(false);
 
   // Close on Escape key
   useEffect(() => {
@@ -90,7 +92,9 @@ export default function ProductDetailOverlay({
       }
     }
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    if (!product) return null;
+
+  return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   // Lock body scroll when overlay is active
@@ -101,9 +105,6 @@ export default function ProductDetailOverlay({
       document.body.style.overflow = originalOverflow;
     };
   }, []);
-
-  if (!product) return null;
-
   const selectedOffer = offers[selectedOfferIdx] || offers[0];
 
   // Price calculations
@@ -115,11 +116,11 @@ export default function ProductDetailOverlay({
 
   // Variants calculation & normalization
   const variantData = useMemo(() => normalizeProductVariants(product), [product]);
-  const [selectedOptions, setSelectedOptions] = useState(() => variantData.selectedMap);
-
-  useEffect(() => {
-    setSelectedOptions(variantData.selectedMap);
-  }, [variantData]);
+  const [userSelectedOptions, setUserSelectedOptions] = useState({});
+  const selectedOptions = useMemo(
+    () => ({ ...(variantData?.selectedMap || {}), ...userSelectedOptions }),
+    [variantData, userSelectedOptions]
+  );
 
   const colorOption = variantData.colorOption;
   const colorValues = colorOption?.values || [];
@@ -235,7 +236,7 @@ export default function ProductDetailOverlay({
                 />
                 <IconButton
                   icon={Heart}
-                  active={liked}
+                  active={isLiked}
                   activeVariant="rose"
                   rounded="full"
                   onClick={() => setLiked((prev) => !prev)}
@@ -343,7 +344,7 @@ export default function ProductDetailOverlay({
                             setSelectedVariant(idx);
                             setHoveredVariantIdx(null);
                             if (colorOption) {
-                              setSelectedOptions((prev) => ({
+                              setUserSelectedOptions((prev) => ({
                                 ...prev,
                                 [colorOption.name]: v.label,
                               }));
@@ -403,7 +404,7 @@ export default function ProductDetailOverlay({
                           key={v.label}
                           type="button"
                           onClick={() =>
-                            setSelectedOptions((prev) => ({
+                            setUserSelectedOptions((prev) => ({
                               ...prev,
                               [channel3SizeOption.name]: v.label,
                             }))
@@ -468,7 +469,7 @@ export default function ProductDetailOverlay({
                           key={v.label}
                           type="button"
                           onClick={() =>
-                            setSelectedOptions((prev) => ({
+                            setUserSelectedOptions((prev) => ({
                               ...prev,
                               [opt.name]: v.label,
                             }))
@@ -587,29 +588,41 @@ export default function ProductDetailOverlay({
               </div>
 
               {selectedOffer && (
-                <button
-                  type="button"
-                  onClick={() => onCheckout(recommendation, selectedOffer, quantity)}
-                  disabled={checkingOut || isSelectedVariantOutOfStock}
-                  className={`font-cal w-full py-2.5 px-3 rounded-none font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
-                    isSelectedVariantOutOfStock
-                      ? "bg-slate-200 text-slate-500 cursor-not-allowed border border-slate-300"
-                      : "bg-[#0070BA] hover:bg-[#005ea6] text-white disabled:opacity-60 disabled:cursor-wait"
-                  }`}
-                >
-                  {isSelectedVariantOutOfStock ? (
-                    <span>Out of Stock · Choose another option</span>
-                  ) : (
-                    <>
-                      <svg className="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
-                        <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.27 5.92-7.15 5.92H10.19c-.43 0-.79.31-.86.73l-.97 5.17a.64.64 0 0 1-.63.52H4.6c-.4 0-.7-.36-.63-.75L6.94 3.71A1.1 1.1 0 0 1 8.02 2.8h6.42c2.73 0 4.67.62 5.627 2.188z" />
-                      </svg>
-                      <span>
-                        {checkingOut ? "Locking Order…" : "Pay via PayPal"}
-                      </span>
-                    </>
-                  )}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onAddToCart) onAddToCart(recommendation, selectedOffer, quantity);
+                    }}
+                    disabled={isSelectedVariantOutOfStock}
+                    className="font-cal py-2.5 px-4 rounded-none border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    Add to Cart
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onCheckout(recommendation, selectedOffer, quantity)}
+                    disabled={checkingOut || isSelectedVariantOutOfStock}
+                    className={`font-cal flex-1 py-2.5 px-3 rounded-none font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                      isSelectedVariantOutOfStock
+                        ? "bg-slate-200 text-slate-500 cursor-not-allowed border border-slate-300"
+                        : "bg-[#0070BA] hover:bg-[#005ea6] text-white disabled:opacity-60 disabled:cursor-wait"
+                    }`}
+                  >
+                    {isSelectedVariantOutOfStock ? (
+                      <span>Out of Stock</span>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
+                          <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.27 5.92-7.15 5.92H10.19c-.43 0-.79.31-.86.73l-.97 5.17a.64.64 0 0 1-.63.52H4.6c-.4 0-.7-.36-.63-.75L6.94 3.71A1.1 1.1 0 0 1 8.02 2.8h6.42c2.73 0 4.67.62 5.627 2.188z" />
+                        </svg>
+                        <span>
+                          {checkingOut ? "Locking Order…" : "Pay via PayPal"}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
 
