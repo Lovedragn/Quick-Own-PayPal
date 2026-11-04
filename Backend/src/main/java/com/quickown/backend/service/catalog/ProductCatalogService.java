@@ -192,7 +192,7 @@ public class ProductCatalogService {
               product.description(),
               product.imageUrl(),
               eligibleOffers.stream().anyMatch(offer -> isInStock(offer.availability())),
-              List.copyOf(eligibleOffers));
+              List.copyOf(eligibleOffers), product.variants());
 
       String key = comparisonKey(normalized);
       ProductResult previous = merged.get(key);
@@ -234,7 +234,8 @@ public class ProductCatalogService {
         first.description() == null ? second.description() : first.description(),
         first.imageUrl() == null ? second.imageUrl() : first.imageUrl(),
         offers.stream().anyMatch(offer -> isInStock(offer.availability())),
-        List.copyOf(offers));
+        List.copyOf(offers),
+        first.variants() != null ? first.variants() : second.variants());
   }
 
   private String comparisonKey(ProductResult product) {

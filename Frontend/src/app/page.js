@@ -1,9 +1,12 @@
 "use client";
 
+import IconButton from "@/components/ui/icon-button";
+
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import ProductCard from "@/components/ProductCard";
+import ProductDetailOverlay from "@/components/ProductDetailOverlay";
 import {
   Search,
   Sparkles,
@@ -21,6 +24,9 @@ import {
   CreditCard,
   Quote,
   ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+  ArrowUpRight,
   Store,
 } from "lucide-react";
 
@@ -95,6 +101,8 @@ export default function Home() {
   const [selectedOffers, setSelectedOffers] = useState({});
   const [quantities, setQuantities] = useState({});
   const [searchComplete, setSearchComplete] = useState(false);
+  const [detailProduct, setDetailProduct] = useState(null);
+  const [detailVariantIndex, setDetailVariantIndex] = useState(0);
   const checkoutAttemptRef = useRef(null);
 
   async function handleSearch(event) {
@@ -252,7 +260,7 @@ export default function Home() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-[#E8F4E2] text-[#3F7A2E] border border-[#D8E5D0]">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-cal font-medium bg-[#E8F4E2] text-[#3F7A2E] border border-[#D8E5D0]">
               <span className="w-2 h-2 rounded-full bg-[#6FA956]" />
               PayPal Sandbox
             </span>
@@ -268,9 +276,9 @@ export default function Home() {
 
         <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 flex flex-col justify-center items-center">
           <div className="hero-inner w-full py-8">
-            <h1>
+            <h1 className="font-cal font-bold text-4xl sm:text-6xl lg:text-[64px] leading-[1.08] tracking-tight text-[#17270C] mb-4">
               Search less. Save more. <br />
-              <span className="em">Instant checkout with PayPal.</span>
+              <span className="text-[#245A19]">Instant checkout with PayPal.</span>
             </h1>
 
             <p className="mt-5 text-base sm:text-lg text-[#4A5A3F] max-w-[50ch] mx-auto text-balance font-normal leading-relaxed">
@@ -341,25 +349,91 @@ export default function Home() {
           {searchComplete && !searching && (
             <div id="results" className="w-full mt-8 mb-12">
               {recommendations.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
-                  {recommendations.map((recommendation) => {
-                    const productId = recommendation.product?.productId;
-                    return (
-                      <ProductCard
-                        key={productId || recommendation.rank}
-                        recommendation={recommendation}
-                        selectedIndex={selectedOffers[productId] ?? 0}
-                        onSelectOffer={selectOffer}
-                        quantity={quantities[productId] ?? 1}
-                        onQuantityChange={changeQuantity}
-                        onCheckout={beginCheckout}
-                        checkingOut={checkoutProduct === productId}
+                <>
+                  {/* Top Bar matching Channel3 demo: View All & Directional Controls */}
+                  <div className="flex items-center justify-between mb-3 text-xs text-slate-700 px-0.5">
+                    <a
+                      href="#results"
+                      className="font-cal inline-flex items-center gap-1 font-medium hover:text-black transition-colors"
+                    >
+                      <span>View all products</span>
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </a>
+                    <div className="flex items-center gap-1.5">
+                      <IconButton
+                        icon={ChevronLeft}
+                        ariaLabel="Previous products"
+                        title="Previous products"
+                        rounded="full"
                       />
-                    );
-                  })}
-                </div>
+                      <IconButton
+                        icon={ChevronRight}
+                        ariaLabel="Next products"
+                        title="Next products"
+                        rounded="full"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 4 Cards Grid with Sharp Borders */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6 text-left w-full items-stretch">
+                    {recommendations.map((recommendation, index) => {
+                      const productId = recommendation.product?.productId;
+                      return (
+                        <ProductCard
+                          key={productId || recommendation.rank}
+                          index={index}
+                          recommendation={recommendation}
+                          selectedIndex={selectedOffers[productId] ?? 0}
+                          onSelectOffer={selectOffer}
+                          quantity={quantities[productId] ?? 1}
+                          onQuantityChange={changeQuantity}
+                          onCheckout={beginCheckout}
+                          checkingOut={checkoutProduct === productId}
+                          onOpenDetail={(rec, swatchIdx) => {
+                            setDetailProduct(rec);
+                            setDetailVariantIndex(swatchIdx || 0);
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  {/* Channel3 Conversational Response & Follow-up Prompt Chips */}
+                  <div className="mt-8 text-center space-y-3.5 max-w-2xl mx-auto">
+                    <p className="font-cal text-xs sm:text-sm text-slate-700 leading-relaxed">
+                      I found {recommendations.length} live {intent?.category || ""} options
+                      {intent?.searchQuery ? ` for "${intent.searchQuery}"` : ""}. Hover any card to inspect merchant stock stack and lock with PayPal:
+                    </p>
+
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {[
+                        `Show lower price options`,
+                        `Show only verified in-stock`,
+                        `Compare top 2 stores`,
+                      ].map((promptChip) => (
+                        <button
+                          key={promptChip}
+                          type="button"
+                          onClick={() => {
+                            const newQuery = `${query} ${promptChip}`;
+                            setQuery(newQuery);
+                            handleSearch(null, newQuery);
+                          }}
+                          className="font-cal px-3 py-1.5 rounded-none border border-slate-300 bg-white hover:bg-slate-100 text-xs text-slate-800 transition-colors cursor-pointer font-medium"
+                        >
+                          {promptChip}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="pt-2 text-slate-400">
+                      <ChevronDown className="w-4 h-4 mx-auto animate-bounce" />
+                    </div>
+                  </div>
+                </>
               ) : (
-                <div className="py-16 text-center text-[#4A5A3F] font-mono text-sm">
+                <div className="py-16 text-center text-[#4A5A3F] font-cal text-sm">
                   No catalogue matches returned. Try a broader search prompt!
                 </div>
               )}
@@ -394,8 +468,8 @@ export default function Home() {
       <section id="how-it-works" className="py-24 border-t border-[#D8E5D0]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="font-serif text-3xl sm:text-5xl text-[#17270C] font-normal mb-4 text-balance">
-              From natural language <span className="italic text-[#245A19]">to PayPal approval</span>.
+            <h2 className="font-cal text-3xl sm:text-5xl text-[#17270C] font-bold mb-4 text-balance">
+              From natural language <span className="text-[#245A19]">to PayPal approval</span>.
             </h2>
             <p className="text-sm sm:text-base text-[#4A5A3F] max-w-[65ch] mx-auto text-pretty">
               AI helps structure what you need, but the server deterministically revalidates
@@ -406,11 +480,9 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#245A19]/30 transition-all">
               <div>
-                <div className="w-9 h-9 rounded-xl bg-[#E8F4E2] text-[#3F7A2E] flex items-center justify-center font-mono font-medium text-xs mb-4">
-                  01
-                </div>
-                <h3 className="font-cal font-bold text-lg text-[#17270C] mb-2">
-                  Understand Request
+                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
+                  <Search className="w-4 h-4 text-[#245A19] flex-shrink-0" />
+                  <span>Understand Request</span>
                 </h3>
                 <p className="text-sm text-[#4A5A3F] leading-relaxed">
                   Extracts your desired product specifications, budget limits, and preferred features from plain English.
@@ -420,11 +492,9 @@ export default function Home() {
 
             <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#245A19]/30 transition-all">
               <div>
-                <div className="w-9 h-9 rounded-xl bg-[#E8F4E2] text-[#3F7A2E] flex items-center justify-center font-mono font-medium text-xs mb-4">
-                  02
-                </div>
-                <h3 className="font-cal font-bold text-lg text-[#17270C] mb-2">
-                  Scan Top Stores
+                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
+                  <Store className="w-4 h-4 text-[#245A19] flex-shrink-0" />
+                  <span>Scan Top Stores</span>
                 </h3>
                 <p className="text-sm text-[#4A5A3F] leading-relaxed">
                   Searches verified retailers to compare current prices, real images, and genuine inventory.
@@ -434,11 +504,9 @@ export default function Home() {
 
             <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#245A19]/30 transition-all">
               <div>
-                <div className="w-9 h-9 rounded-xl bg-[#E8F4E2] text-[#3F7A2E] flex items-center justify-center font-mono font-medium text-xs mb-4">
-                  03
-                </div>
-                <h3 className="font-cal font-bold text-lg text-[#17270C] mb-2">
-                  Lock Best Price
+                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
+                  <Lock className="w-4 h-4 text-[#245A19] flex-shrink-0" />
+                  <span>Lock Best Price</span>
                 </h3>
                 <p className="text-sm text-[#4A5A3F] leading-relaxed">
                   Confirms the exact offer price and merchant stock availability directly before checkout starts.
@@ -448,11 +516,9 @@ export default function Home() {
 
             <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#0070BA]/30 transition-all">
               <div>
-                <div className="w-9 h-9 rounded-xl bg-[#0070BA]/10 text-[#0070BA] flex items-center justify-center font-mono font-medium text-xs mb-4">
-                  04
-                </div>
-                <h3 className="font-cal font-bold text-lg text-[#17270C] mb-2">
-                  Secure Checkout
+                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
+                  <CreditCard className="w-4 h-4 text-[#0070BA] flex-shrink-0" />
+                  <span>Secure Checkout</span>
                 </h3>
                 <p className="text-sm text-[#4A5A3F] leading-relaxed">
                   Review your items and complete payment in one click with official PayPal buyer protection.
@@ -467,8 +533,8 @@ export default function Home() {
       <section id="stats" className="py-20 bg-[#E8F4E2]/70 border-t border-[#D8E5D0]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <h2 className="font-serif text-3xl sm:text-5xl text-[#17270C] font-normal mb-3 text-balance">
-              Guaranteed <span className="italic text-[#245A19]">authenticity</span>.
+            <h2 className="font-cal text-3xl sm:text-5xl text-[#17270C] font-bold mb-3 text-balance">
+              Guaranteed <span className="text-[#245A19]">authenticity</span>.
             </h2>
             <p className="text-sm sm:text-base text-[#4A5A3F] max-w-[65ch] mx-auto text-pretty">
               Every merchant offer is verified in real time from retailer inventory. Zero guesswork.
@@ -527,7 +593,7 @@ export default function Home() {
             </span>
           </div>
 
-          <div className="text-xs font-mono text-[#4A5A3F] flex items-center gap-4">
+          <div className="text-xs font-cal text-[#4A5A3F] flex items-center gap-4">
             <span>Verified Stores</span>
             <span>&bull;</span>
             <span>Live Price Locks</span>
@@ -535,11 +601,26 @@ export default function Home() {
             <span>PayPal Sandbox</span>
           </div>
 
-          <span className="text-xs font-mono px-3 py-1 rounded-full bg-[#E8F4E2] text-[#3F7A2E] border border-[#D8E5D0]">
+          <span className="text-xs font-cal px-3 py-1 rounded-full bg-[#E8F4E2] text-[#3F7A2E] border border-[#D8E5D0]">
             DEMO ENVIRONMENT &bull; NO LIVE CHARGES
           </span>
         </div>
       </footer>
+
+      {/* Product Detail Overlay Modal (Channel3 PDP Style) */}
+      {detailProduct && (
+        <ProductDetailOverlay
+          recommendation={detailProduct}
+          selectedIndex={selectedOffers[detailProduct.product?.productId] ?? 0}
+          onSelectOffer={selectOffer}
+          quantity={quantities[detailProduct.product?.productId] ?? 1}
+          onQuantityChange={changeQuantity}
+          onCheckout={beginCheckout}
+          checkingOut={checkoutProduct === detailProduct.product?.productId}
+          initialVariantIndex={detailVariantIndex}
+          onClose={() => setDetailProduct(null)}
+        />
+      )}
     </div>
   );
 }

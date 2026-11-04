@@ -7,7 +7,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
-/** Gemini-backed intent extraction; catalogue facts are fetched separately from Channel3. */
+/**
+ * ###not useful rgt now
+ * Gemini-backed intent extraction; catalogue facts are fetched separately from Channel3.
+ * Currently bypassed: user raw search query goes straight to Channel3 API.
+ */
 @Service
 public class GeminiShoppingIntentInterpreter implements ShoppingIntentInterpreter {
 

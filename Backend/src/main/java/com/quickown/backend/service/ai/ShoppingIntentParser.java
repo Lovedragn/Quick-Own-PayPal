@@ -11,7 +11,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
-/** Parses Gemini's catalogue-search intent and independently validates numeric constraints. */
+/**
+ * ###not useful rgt now
+ * Parses Gemini's catalogue-search intent and independently validates numeric constraints.
+ */
 @Component
 public class ShoppingIntentParser {
 

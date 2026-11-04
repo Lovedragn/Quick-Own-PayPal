@@ -30,7 +30,7 @@
   --serif: 'Cormorant Garamond', 'Newsreader', 'PT Serif', Georgia, serif;
   --display-serif: 'Cormorant Garamond', 'Newsreader', Georgia, 'Times New Roman', serif;
   --sans: var(--font-calsans), 'Cal Sans', 'Schibsted Grotesk', Inter, ui-sans-serif, system-ui, sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --mono: var(--font-calsans), 'Cal Sans', sans-serif;
 }
 
 *, *::before, *::after {
