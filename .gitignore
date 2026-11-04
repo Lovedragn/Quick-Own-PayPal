@@ -7,6 +7,8 @@
 **/.env.*
 !**/.env.example
 !**/.env.local.example
+.intelligence.env
+**/.intelligence.env
 
 # Dependencies and build outputs
 **/node_modules/
@@ -19,11 +21,19 @@ Backend/data/
 # IDE and OS files
 .idea/
 **/.idea/
+.run/
+**/.run/
+.vscode/
+**/.vscode/
 *.iml
 *.iws
 *.ipr
 .DS_Store
 Thumbs.db
+
+# Cache and Agent artifacts
+graphify-out/
+.impeccable/
 
 # Local logs and test output
 *.log
