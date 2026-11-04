@@ -42,3 +42,6 @@ npm-ci.log
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.intelligence.env
+Backend/.run/

@@ -25,7 +25,9 @@ public class PayPalOrdersClient {
       @Value("${paypal.base-url:https://api-m.sandbox.paypal.com}") String baseUrl) {
     this.authService = authService;
     this.baseUrl =
-        baseUrl == null ? "https://api-m.sandbox.paypal.com" : baseUrl.replaceAll("/+$", "");
+        baseUrl == null || baseUrl.isBlank()
+            ? "https://api-m.sandbox.paypal.com"
+            : baseUrl.replaceAll("[;/\\s]+$", "");
     this.httpClient =
         HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)

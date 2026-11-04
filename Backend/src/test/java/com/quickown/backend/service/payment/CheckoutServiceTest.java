@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.quickown.backend.catalog.MockProductCatalog;
+
 import com.quickown.backend.dto.checkout.CheckoutItem;
 import com.quickown.backend.dto.checkout.CheckoutRequest;
 import com.quickown.backend.exception.CheckoutConflictException;
@@ -65,7 +65,7 @@ class CheckoutServiceTest {
     PayPalAuthService auth =
         new PayPalAuthService("test-paypal-client-id", "test-paypal-client-secret", baseUrl);
     paypalOrdersClient = new PayPalOrdersClient(auth, baseUrl);
-    productCatalogService = new ProductCatalogService(channel3, new MockProductCatalog());
+    productCatalogService = new ProductCatalogService(channel3);
     storageFile = tempDir.resolve("checkout-sessions.json");
     checkoutService =
         new CheckoutService(
@@ -306,7 +306,7 @@ class CheckoutServiceTest {
   void requiresSelectedOfferUrlWhenMerchantHasMultipleEligibleOffers() {
     ProductCatalogService multiOfferCatalog =
         new ProductCatalogService(
-            new Channel3CatalogClient("test-channel3-key", baseUrl), new MockProductCatalog()) {
+            new Channel3CatalogClient("test-channel3-key", baseUrl)) {
           @Override
           public List<com.quickown.backend.dto.product.ProductResult> search(
               String query, boolean inStockOnly, String currency) {

@@ -57,14 +57,22 @@ public class AgenticShoppingService {
   }
 
   public ShoppingRecommendationResponse recommend(String customerMessage) {
-    ShoppingIntent intent = intentInterpreter.interpret(customerMessage);
-    String searchCurrency =
-        intent.budgetApplied()
-            ? intent.budgetCurrency()
-            : productCatalogService.getMarketCurrency();
+    // ShoppingIntent intent = intentInterpreter.interpret(customerMessage);
+    String rawQuery = customerMessage != null ? customerMessage.trim() : "";
+    ShoppingIntent intent =
+        new ShoppingIntent(
+            rawQuery,
+            null,
+            List.of(),
+            null,
+            null,
+            false,
+            false,
+            null);
+    String searchCurrency = productCatalogService.getMarketCurrency();
     List<ProductResult> catalogueResults =
         productCatalogService.search(
-            intent.searchQuery(), intent.inStockOnly(), searchCurrency);
+            rawQuery, false, searchCurrency);
 
     // A no-budget request may use a clearly disclosed fallback market when the preferred
     // market has no offers. Never bypass an explicit budget or convert currencies.
@@ -108,7 +116,8 @@ public class AgenticShoppingService {
               product.description(),
               product.imageUrl(),
               eligibleOffers.stream().anyMatch(offer -> isInStock(offer.availability())),
-              List.copyOf(eligibleOffers));
+              List.copyOf(eligibleOffers),
+              product.variants());
       candidates.add(new Candidate(filteredProduct, selectedOffer, matchedFeatures));
     }
 

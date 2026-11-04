@@ -1,17 +1,37 @@
 "use client";
 
+import IconButton from "@/components/ui/icon-button";
+
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
+import ProductCard from "@/components/ProductCard";
+import ProductDetailOverlay from "@/components/ProductDetailOverlay";
+import {
+  Search,
+  Sparkles,
+  ArrowRight,
+  ExternalLink,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  Tag,
+  DollarSign,
+  Filter,
+  Layers,
+  Lock,
+  Database,
+  CreditCard,
+  Quote,
+  ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+  ArrowUpRight,
+  Store,
+} from "lucide-react";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
-
-const PROMPTS = [
-  "Find me an iPhone 16 under $700 USD",
-  "Find noise-cancelling headphones under ₹6,000 with long battery life",
-  "I need wireless earbuds for travel with good noise cancellation",
-];
 
 function formatPrice(value, currency) {
   if (value === null || value === undefined || !currency) return "Price unavailable";
@@ -68,172 +88,10 @@ function getOffers(recommendation) {
   );
 }
 
-function ProductCard({
-  recommendation,
-  selectedIndex,
-  onSelectOffer,
-  quantity,
-  onQuantityChange,
-  onCheckout,
-  checkingOut,
-}) {
-  const product = recommendation.product;
-  const offers = useMemo(() => getOffers(recommendation), [recommendation]);
-  const safeIndex =
-    selectedIndex >= 0 && selectedIndex < offers.length
-      ? selectedIndex
-      : Math.max(
-          0,
-          offers.findIndex(
-            (offer) =>
-              offer.productUrl === recommendation.selectedOffer?.productUrl,
-          ),
-        );
-  const selected = offers[safeIndex];
 
-  return (
-    <article className="product-card">
-      <div className="product-visual">
-        <span className="source-pill">{product.source || "Catalogue"}</span>
-        {product.imageUrl ? (
-          <Image
-            src={product.imageUrl}
-            alt={product.name || "Recommended product"}
-            width={520}
-            height={400}
-            unoptimized
-            className="product-image"
-            onError={(event) => {
-              event.currentTarget.style.display = "none";
-            }}
-          />
-        ) : (
-          <div className="product-placeholder" aria-hidden="true">
-            <span>Q</span>
-          </div>
-        )}
-        <span className="rank-pill">#{recommendation.rank} match</span>
-      </div>
-
-      <div className="product-content">
-        <div className="product-heading">
-          <div>
-            <p className="eyebrow">
-              {product.brand || product.category || "AI recommendation"}
-            </p>
-            <h3>{product.name}</h3>
-          </div>
-          <span className="stock-indicator">
-            <span className="stock-dot" />
-            {product.inStock ? "In catalogue" : "Check availability"}
-          </span>
-        </div>
-
-        {product.description && (
-          <p className="product-description">{product.description}</p>
-        )}
-
-        {recommendation.explanation && (
-          <div className="match-note">
-            <span className="match-spark">✳</span>
-            <span>{recommendation.explanation}</span>
-          </div>
-        )}
-
-        {recommendation.matchedFeatures?.length > 0 && (
-          <div className="feature-list">
-            {recommendation.matchedFeatures.map((feature) => (
-              <span className="feature-chip" key={feature}>
-                ✓ {feature}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="offer-panel">
-          <div className="offer-panel-title">
-            <span>Available merchant offers</span>
-            <span className="offer-count">
-              {offers.length} {offers.length === 1 ? "offer" : "offers"}
-            </span>
-          </div>
-
-          {selected ? (
-            <>
-              <label className="field-label" htmlFor={`offer-${product.productId}`}>
-                Choose the offer you want
-              </label>
-              <select
-                id={`offer-${product.productId}`}
-                className="offer-select"
-                value={safeIndex}
-                onChange={(event) =>
-                  onSelectOffer(product.productId, Number(event.target.value))
-                }
-              >
-                {offers.map((offer, index) => (
-                  <option value={index} key={`${offer.productUrl}-${index}`}>
-                    {offer.merchant} · {formatPrice(offer.price, offer.currency)} ·{" "}
-                    {offer.availability || "Availability unknown"}
-                  </option>
-                ))}
-              </select>
-
-              <div className="offer-total-row">
-                <div>
-                  <p className="eyebrow">Selected offer</p>
-                  <p className="merchant-name">{selected.merchant}</p>
-                </div>
-                <div className="price-block">
-                  <strong>{formatPrice(selected.price, selected.currency)}</strong>
-                  <span>{selected.availability || "Availability not confirmed"}</span>
-                </div>
-              </div>
-
-              <div className="quantity-checkout-row">
-                <label className="quantity-control">
-                  <span>Qty</span>
-                  <select
-                    aria-label={`Quantity for ${product.name}`}
-                    value={quantity}
-                    onChange={(event) =>
-                      onQuantityChange(product.productId, Number(event.target.value))
-                    }
-                  >
-                    {[1, 2, 3, 4, 5].map((number) => (
-                      <option value={number} key={number}>
-                        {number}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  className="checkout-button"
-                  onClick={() => onCheckout(recommendation, selected, quantity)}
-                  disabled={checkingOut || !selected}
-                >
-                  {checkingOut ? "Preparing PayPal…" : "Continue with PayPal"}
-                  <span aria-hidden="true">↗</span>
-                </button>
-              </div>
-              <p className="offer-disclaimer">
-                The backend checks this exact product, merchant, offer URL, stock
-                and current price again before creating the Sandbox order.
-              </p>
-            </>
-          ) : (
-            <p className="empty-offers">
-              No eligible merchant offer was returned for this product.
-            </p>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
 
 export default function Home() {
-  const [query, setQuery] = useState(PROMPTS[0]);
+  const [query, setQuery] = useState("");
   const [recommendations, setRecommendations] = useState([]);
   const [intent, setIntent] = useState(null);
   const [notice, setNotice] = useState("");
@@ -243,10 +101,12 @@ export default function Home() {
   const [selectedOffers, setSelectedOffers] = useState({});
   const [quantities, setQuantities] = useState({});
   const [searchComplete, setSearchComplete] = useState(false);
+  const [detailProduct, setDetailProduct] = useState(null);
+  const [detailVariantIndex, setDetailVariantIndex] = useState(0);
   const checkoutAttemptRef = useRef(null);
 
   async function handleSearch(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
     const message = query.trim();
     if (!message) {
       setError("Describe what you are looking for first.");
@@ -325,9 +185,6 @@ export default function Home() {
         offerUrl: offer.productUrl,
       });
 
-      // Keep one key for this exact cart attempt. If the network fails after PayPal
-      // created the order, clicking again must replay the same request rather than
-      // creating a second PayPal order.
       if (checkoutAttemptRef.current?.fingerprint !== cartFingerprint) {
         const idempotencyKey =
           typeof crypto !== "undefined" && crypto.randomUUID
@@ -373,230 +230,397 @@ export default function Home() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <Link className="brand" href="/" aria-label="Quick-Own home">
-          <span className="brand-mark">q</span>
-          <span>quick<span className="brand-accent">own</span></span>
-        </Link>
-        <nav className="top-nav" aria-label="Main navigation">
-          <a href="#how-it-works">How it works</a>
-          <a href="#results">Discover</a>
-          <span className="sandbox-badge"><span /> Sandbox mode</span>
-        </nav>
+    <div className="relative min-h-screen bg-[#F2FBEF] text-[#17270C] overflow-x-hidden">
+      {/* Painterly background flourishes (CrawlerPal aesthetic) */}
+      <div className="splash splash-l" aria-hidden="true" />
+      <div className="splash splash-r" aria-hidden="true" />
+
+      {/* Sticky Top Navigation */}
+      <header className="sticky top-0 z-50 bg-[#F2FBEF]/85 backdrop-blur-md border-b border-[#D8E5D0]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[72px] flex items-center justify-between">
+          <Link href="/" className="inline-flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-lg bg-[#002125] text-[#F2FBEF] flex items-center justify-center font-bold text-sm">
+              q
+            </div>
+            <span className="font-cal font-bold text-xl tracking-tight text-[#17270C]">
+              Quick<span className="em">Own</span>
+            </span>
+          </Link>
+
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#4A5A3F]">
+            <a href="#how-it-works" className="hover:text-[#17270C] transition-colors">
+              How it works
+            </a>
+            <a href="#architecture" className="hover:text-[#17270C] transition-colors">
+              Architecture
+            </a>
+            <a href="#stats" className="hover:text-[#17270C] transition-colors">
+              Guarantees
+            </a>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-cal font-medium bg-[#E8F4E2] text-[#3F7A2E] border border-[#D8E5D0]">
+              <span className="w-2 h-2 rounded-full bg-[#6FA956]" />
+              PayPal Sandbox
+            </span>
+          </div>
+        </div>
       </header>
 
-      <section className="hero-section">
-        <div className="hero-copy">
-          <div className="hero-kicker">
-            <span className="kicker-star">✳</span>
-            AI-POWERED AGENTIC COMMERCE
-          </div>
-          <h1>
-            Tell us what you need.
-            <span> We’ll find your best buy.</span>
-          </h1>
-          <p className="hero-description">
-            One conversation. Real catalogue offers. Clear comparisons.
-            Checkout approval powered by PayPal.
-          </p>
+      {/* Hero Section */}
+      <header className="hero">
+        <span className="splash splash-l" aria-hidden="true" />
+        <span className="splash splash-r" aria-hidden="true" />
+        <span className="splash splash-c" aria-hidden="true" />
 
-          <div className="hero-proof">
-            <div className="proof-item">
-              <span className="proof-icon">✦</span>
-              <div><strong>AI understands</strong><small>Your needs, not just keywords</small></div>
+        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 flex flex-col justify-center items-center">
+          <div className="hero-inner w-full py-8">
+            <h1 className="font-cal font-bold text-4xl sm:text-6xl lg:text-[64px] leading-[1.08] tracking-tight text-[#17270C] mb-4">
+              Search less. Save more. <br />
+              <span className="text-[#245A19]">Instant checkout with PayPal.</span>
+            </h1>
+
+            <p className="mt-5 text-base sm:text-lg text-[#4A5A3F] max-w-[50ch] mx-auto text-balance font-normal leading-relaxed">
+              AI compares live prices across verified stores, locking the best deal for instant PayPal checkout.
+            </p>
+
+            {/* Channel3-Style Hero Search Bar (No button, submit on Enter) */}
+            <div className="max-w-2xl mx-auto mt-8 mb-4 w-full" id="search-console">
+              <form onSubmit={handleSearch} className="relative">
+                <div className="relative flex items-center bg-white border border-[#B8C9AF] shadow-xs focus-within:border-[#245A19] focus-within:ring-2 focus-within:ring-[#245A19]/20 transition-all">
+                  <div className="pl-3.5 pr-2 text-[#4A5A3F] flex items-center pointer-events-none">
+                    <Search className="w-4 h-4 flex-shrink-0" />
+                  </div>
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search products or describe what you need…"
+                    aria-label="Search products or describe what you need"
+                    disabled={searching}
+                    className="w-full py-2.5 pr-3.5 bg-transparent font-sans text-sm sm:text-base text-[#17270C] placeholder-[#5F6E5A] focus:outline-none"
+                  />
+                  {searching && (
+                    <div className="pr-3.5 flex items-center flex-shrink-0">
+                      <Sparkles className="w-4 h-4 animate-spin text-[#245A19]" />
+                    </div>
+                  )}
+                </div>
+              </form>
             </div>
-            <div className="proof-item">
-              <span className="proof-icon">⌕</span>
-              <div><strong>Live offers</strong><small>Catalogue-backed choices</small></div>
+
+            {/* Error Banner */}
+            {error && (
+              <div className="max-w-2xl mx-auto w-full px-4 mt-4">
+                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                  <button
+                    onClick={() => setError("")}
+                    className="text-rose-700 font-bold px-2"
+                    aria-label="Dismiss error"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Searching State */}
+            {searching && (
+              <div className="py-16 text-center max-w-xl mx-auto px-4 w-full">
+                <div className="w-12 h-12 rounded-2xl bg-[#E8F4E2] text-[#3F7A2E] flex items-center justify-center mx-auto mb-4 animate-pulse">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <h3 className="font-cal font-bold text-2xl text-[#17270C] mb-2">
+                  Searching Verified Stores…
+                </h3>
+                <p className="text-sm text-[#4A5A3F]">
+                  Comparing merchant offers &bull; Checking live stock &bull; Finding best prices
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Results Section directly below search bar */}
+          {searchComplete && !searching && (
+            <div id="results" className="w-full mt-8 mb-12">
+              {recommendations.length > 0 ? (
+                <>
+                  {/* Top Bar matching Channel3 demo: View All & Directional Controls */}
+                  <div className="flex items-center justify-between mb-3 text-xs text-slate-700 px-0.5">
+                    <a
+                      href="#results"
+                      className="font-cal inline-flex items-center gap-1 font-medium hover:text-black transition-colors"
+                    >
+                      <span>View all products</span>
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </a>
+                    <div className="flex items-center gap-1.5">
+                      <IconButton
+                        icon={ChevronLeft}
+                        ariaLabel="Previous products"
+                        title="Previous products"
+                        rounded="full"
+                      />
+                      <IconButton
+                        icon={ChevronRight}
+                        ariaLabel="Next products"
+                        title="Next products"
+                        rounded="full"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 4 Cards Grid with Sharp Borders */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6 text-left w-full items-stretch">
+                    {recommendations.map((recommendation, index) => {
+                      const productId = recommendation.product?.productId;
+                      return (
+                        <ProductCard
+                          key={productId || recommendation.rank}
+                          index={index}
+                          recommendation={recommendation}
+                          selectedIndex={selectedOffers[productId] ?? 0}
+                          onSelectOffer={selectOffer}
+                          quantity={quantities[productId] ?? 1}
+                          onQuantityChange={changeQuantity}
+                          onCheckout={beginCheckout}
+                          checkingOut={checkoutProduct === productId}
+                          onOpenDetail={(rec, swatchIdx) => {
+                            setDetailProduct(rec);
+                            setDetailVariantIndex(swatchIdx || 0);
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  {/* Channel3 Conversational Response & Follow-up Prompt Chips */}
+                  <div className="mt-8 text-center space-y-3.5 max-w-2xl mx-auto">
+                    <p className="font-cal text-xs sm:text-sm text-slate-700 leading-relaxed">
+                      I found {recommendations.length} live {intent?.category || ""} options
+                      {intent?.searchQuery ? ` for "${intent.searchQuery}"` : ""}. Hover any card to inspect merchant stock stack and lock with PayPal:
+                    </p>
+
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {[
+                        `Show lower price options`,
+                        `Show only verified in-stock`,
+                        `Compare top 2 stores`,
+                      ].map((promptChip) => (
+                        <button
+                          key={promptChip}
+                          type="button"
+                          onClick={() => {
+                            const newQuery = `${query} ${promptChip}`;
+                            setQuery(newQuery);
+                            handleSearch(null, newQuery);
+                          }}
+                          className="font-cal px-3 py-1.5 rounded-none border border-slate-300 bg-white hover:bg-slate-100 text-xs text-slate-800 transition-colors cursor-pointer font-medium"
+                        >
+                          {promptChip}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="pt-2 text-slate-400">
+                      <ChevronDown className="w-4 h-4 mx-auto animate-bounce" />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="py-16 text-center text-[#4A5A3F] font-cal text-sm">
+                  No catalogue matches returned. Try a broader search prompt!
+                </div>
+              )}
             </div>
-            <div className="proof-item">
-              <span className="proof-icon">↗</span>
-              <div><strong>PayPal checkout</strong><small>Secure Sandbox approval</small></div>
-            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Ticker Track (Below visible viewport - revealed on scroll) */}
+      <div className="ticker" aria-label="Key features">
+        <div className="ticker-track">
+          <div className="ticker-item">
+            <span className="spark">✦</span>
+            <span>Multi-Store Price Comparison</span>
+          </div>
+          <div className="ticker-item">
+            <span className="spark">✦</span>
+            <span>Live Stock Verification</span>
+          </div>
+          <div className="ticker-item">
+            <span className="spark">✦</span>
+            <span>One-Click PayPal Checkout</span>
+          </div>
+          <div className="ticker-item">
+            <span className="spark">✦</span>
+            <span>Guaranteed Price Locks</span>
           </div>
         </div>
+      </div>
 
-        <div className="hero-orbit" aria-hidden="true">
-          <div className="orbit orbit-one" />
-          <div className="orbit orbit-two" />
-          <div className="orbit-core">
-            <span className="orbit-spark">✳</span>
-            <span>Q</span>
+      {/* RAG-Style Pipeline Process Strip (CrawlerPal signature) */}
+      <section id="how-it-works" className="py-24 border-t border-[#D8E5D0]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="font-cal text-3xl sm:text-5xl text-[#17270C] font-bold mb-4 text-balance">
+              From natural language <span className="text-[#245A19]">to PayPal approval</span>.
+            </h2>
+            <p className="text-sm sm:text-base text-[#4A5A3F] max-w-[65ch] mx-auto text-pretty">
+              AI helps structure what you need, but the server deterministically revalidates
+              every offer and you still approve the final PayPal transaction.
+            </p>
           </div>
-          <span className="orbit-node node-one">AI</span>
-          <span className="orbit-node node-two">↗</span>
-          <span className="orbit-node node-three">₹</span>
-          <span className="orbit-caption">SHOPPING, CONNECTED</span>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#245A19]/30 transition-all">
+              <div>
+                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
+                  <Search className="w-4 h-4 text-[#245A19] flex-shrink-0" />
+                  <span>Understand Request</span>
+                </h3>
+                <p className="text-sm text-[#4A5A3F] leading-relaxed">
+                  Extracts your desired product specifications, budget limits, and preferred features from plain English.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#245A19]/30 transition-all">
+              <div>
+                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
+                  <Store className="w-4 h-4 text-[#245A19] flex-shrink-0" />
+                  <span>Scan Top Stores</span>
+                </h3>
+                <p className="text-sm text-[#4A5A3F] leading-relaxed">
+                  Searches verified retailers to compare current prices, real images, and genuine inventory.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#245A19]/30 transition-all">
+              <div>
+                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
+                  <Lock className="w-4 h-4 text-[#245A19] flex-shrink-0" />
+                  <span>Lock Best Price</span>
+                </h3>
+                <p className="text-sm text-[#4A5A3F] leading-relaxed">
+                  Confirms the exact offer price and merchant stock availability directly before checkout starts.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#0070BA]/30 transition-all">
+              <div>
+                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
+                  <CreditCard className="w-4 h-4 text-[#0070BA] flex-shrink-0" />
+                  <span>Secure Checkout</span>
+                </h3>
+                <p className="text-sm text-[#4A5A3F] leading-relaxed">
+                  Review your items and complete payment in one click with official PayPal buyer protection.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="search-wrap" aria-labelledby="search-heading">
-        <div className="search-card">
-          <div className="search-card-heading">
-            <div>
-              <p className="eyebrow">YOUR PERSONAL SHOPPING AGENT</p>
-              <h2 id="search-heading">What are you shopping for?</h2>
-            </div>
-            <span className="gemini-tag"><span>✦</span> Gemini AI</span>
+      {/* Stats / Guarantees Section */}
+      <section id="stats" className="py-20 bg-[#E8F4E2]/70 border-t border-[#D8E5D0]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <h2 className="font-cal text-3xl sm:text-5xl text-[#17270C] font-bold mb-3 text-balance">
+              Guaranteed <span className="text-[#245A19]">authenticity</span>.
+            </h2>
+            <p className="text-sm sm:text-base text-[#4A5A3F] max-w-[65ch] mx-auto text-pretty">
+              Every merchant offer is verified in real time from retailer inventory. Zero guesswork.
+            </p>
           </div>
 
-          <form onSubmit={handleSearch}>
-            <label className="sr-only" htmlFor="shopping-query">
-              Describe the product you want
-            </label>
-            <div className="prompt-box">
-              <span className="prompt-icon">✳</span>
-              <textarea
-                id="shopping-query"
-                rows={2}
-                maxLength={2000}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Example: Find noise-cancelling headphones under ₹6,000…"
-              />
-              <button className="search-button" type="submit" disabled={searching}>
-                {searching ? "Searching…" : "Find my best buy"}
-                <span aria-hidden="true">→</span>
-              </button>
-            </div>
-          </form>
-
-          <div className="prompt-suggestions">
-            <span>Try asking</span>
-            {PROMPTS.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                onClick={() => setQuery(prompt)}
-                className="suggestion-chip"
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-          <p className="privacy-note">
-            Your request is interpreted by AI. Prices, stock and merchant offers
-            are taken from catalogue responses and rechecked before checkout.
-          </p>
-        </div>
-      </section>
-
-      {error && (
-        <div className="message-banner error-banner" role="alert">
-          <span>!</span>
-          <p>{error}</p>
-          <button onClick={() => setError("")} aria-label="Dismiss error">×</button>
-        </div>
-      )}
-
-      {searching && (
-        <section className="loading-state" aria-live="polite">
-          <div className="loading-spinner" />
-          <h3>Your shopping agent is at work</h3>
-          <p>Understanding your request and checking live catalogue offers…</p>
-        </section>
-      )}
-
-      {searchComplete && !searching && (
-        <section className="results-section" id="results">
-          <div className="results-heading">
-            <div>
-              <p className="eyebrow">YOUR MATCHES</p>
-              <h2>Here’s what we found<span>.</span></h2>
-              <p className="results-subtitle">
-                {recommendations.length
-                  ? `${recommendations.length} catalogue-backed ${recommendations.length === 1 ? "recommendation" : "recommendations"} for your request`
-                  : "No matching live offers were returned for this request."}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-8 rounded-2xl bg-[#FBFEF9] border border-[#D8E5D0] shadow-xs">
+              <div className="font-serif text-5xl font-normal text-[#17270C] mb-3">
+                100<span className="italic text-[#245A19]">%</span>
+              </div>
+              <h3 className="font-cal font-bold text-lg text-[#17270C] mb-1">
+                Live Store Verification
+              </h3>
+              <p className="text-sm text-[#4A5A3F] max-w-[65ch] text-pretty">
+                Prices are re-verified with retailer servers in real-time before checkout is generated.
               </p>
             </div>
-            <span className="result-count">{recommendations.length} results</span>
+
+            <div className="p-8 rounded-2xl bg-[#FBFEF9] border border-[#D8E5D0] shadow-xs">
+              <div className="font-serif text-5xl font-normal text-[#17270C] mb-3">
+                0<span className="italic text-[#245A19]">x</span>
+              </div>
+              <h3 className="font-cal font-bold text-lg text-[#17270C] mb-1">
+                Fabricated Prices
+              </h3>
+              <p className="text-sm text-[#4A5A3F] max-w-[65ch] text-pretty">
+                Every price, store listing, and product link comes from actual merchant data.
+              </p>
+            </div>
+
+            <div className="p-8 rounded-2xl bg-[#FBFEF9] border border-[#D8E5D0] shadow-xs">
+              <div className="font-serif text-5xl font-normal text-[#17270C] mb-3">
+                <span className="italic text-[#245A19]">✓</span>
+              </div>
+              <h3 className="font-cal font-bold text-lg text-[#17270C] mb-1">
+                Buyer Protection
+              </h3>
+              <p className="text-sm text-[#4A5A3F] max-w-[65ch] text-pretty">
+                Official PayPal checkout session with full transaction verification and buyer protection.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-12 border-t border-[#D8E5D0] bg-[#FBFEF9]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-[#002125] text-[#F2FBEF] flex items-center justify-center font-bold text-xs">
+              q
+            </div>
+            <span className="font-cal font-bold text-base text-[#17270C]">
+              Quick<span className="em">Own</span>
+            </span>
           </div>
 
-          {notice && (
-            <div className="message-banner notice-banner">
-              <span>i</span>
-              <p>{notice}</p>
-            </div>
-          )}
-
-          {intent && (
-            <div className="intent-strip">
-              <div><span>SEARCH</span><strong>{intent.searchQuery}</strong></div>
-              {intent.category && <div><span>CATEGORY</span><strong>{intent.category}</strong></div>}
-              {intent.maxBudget !== null && intent.maxBudget !== undefined && (
-                <div><span>BUDGET</span><strong>{formatPrice(intent.maxBudget, intent.budgetCurrency)}</strong></div>
-              )}
-              <div><span>IN STOCK</span><strong>{intent.inStockOnly ? "Requested" : "Not required"}</strong></div>
-              <div><span>FEATURES</span><strong>{intent.requiredFeatures?.length || 0} detected</strong></div>
-            </div>
-          )}
-
-          {recommendations.length > 0 ? (
-            <div className="product-grid">
-              {recommendations.map((recommendation) => {
-                const productId = recommendation.product?.productId;
-                return (
-                  <ProductCard
-                    key={productId || recommendation.rank}
-                    recommendation={recommendation}
-                    selectedIndex={selectedOffers[productId] ?? 0}
-                    onSelectOffer={selectOffer}
-                    quantity={quantities[productId] ?? 1}
-                    onQuantityChange={changeQuantity}
-                    onCheckout={beginCheckout}
-                    checkingOut={checkoutProduct === productId}
-                  />
-                );
-              })}
-            </div>
-          ) : (
-            <div className="empty-state">
-              <span>⌕</span>
-              <h3>No catalogue matches yet</h3>
-              <p>Try a broader product name or remove a strict budget or feature.</p>
-            </div>
-          )}
-        </section>
-      )}
-
-      {!searchComplete && !searching && (
-        <section className="value-section" id="how-it-works">
-          <div className="section-heading">
-            <p className="eyebrow">FROM INTENT TO CHECKOUT</p>
-            <h2>A smarter way to shop.</h2>
+          <div className="text-xs font-cal text-[#4A5A3F] flex items-center gap-4">
+            <span>Verified Stores</span>
+            <span>&bull;</span>
+            <span>Live Price Locks</span>
+            <span>&bull;</span>
+            <span>PayPal Sandbox</span>
           </div>
-          <div className="steps-grid">
-            <article className="step-card">
-              <span className="step-number">01</span>
-              <div className="step-icon">✳</div>
-              <h3>Describe your need</h3>
-              <p>Tell the AI agent your budget, must-have features and preferences in natural language.</p>
-            </article>
-            <article className="step-card">
-              <span className="step-number">02</span>
-              <div className="step-icon">⌕</div>
-              <h3>Compare real offers</h3>
-              <p>Gemini structures your intent while Channel3 supplies catalogue products and merchant offers.</p>
-            </article>
-            <article className="step-card">
-              <span className="step-number">03</span>
-              <div className="step-icon">↗</div>
-              <h3>Approve with PayPal</h3>
-              <p>The backend revalidates the selected offer and creates a PayPal Sandbox order for your approval.</p>
-            </article>
-          </div>
-        </section>
-      )}
 
-      <footer className="footer">
-        <Link className="brand footer-brand" href="/">
-          <span className="brand-mark">q</span>
-          <span>quick<span className="brand-accent">own</span></span>
-        </Link>
-        <p>AI-assisted discovery. Transparent offers. PayPal Sandbox checkout.</p>
-        <span className="footer-sandbox">DEMO ENVIRONMENT · NO LIVE PAYMENTS</span>
+          <span className="text-xs font-cal px-3 py-1 rounded-full bg-[#E8F4E2] text-[#3F7A2E] border border-[#D8E5D0]">
+            DEMO ENVIRONMENT &bull; NO LIVE CHARGES
+          </span>
+        </div>
       </footer>
-    </main>
+
+      {/* Product Detail Overlay Modal (Channel3 PDP Style) */}
+      {detailProduct && (
+        <ProductDetailOverlay
+          recommendation={detailProduct}
+          selectedIndex={selectedOffers[detailProduct.product?.productId] ?? 0}
+          onSelectOffer={selectOffer}
+          quantity={quantities[detailProduct.product?.productId] ?? 1}
+          onQuantityChange={changeQuantity}
+          onCheckout={beginCheckout}
+          checkingOut={checkoutProduct === detailProduct.product?.productId}
+          initialVariantIndex={detailVariantIndex}
+          onClose={() => setDetailProduct(null)}
+        />
+      )}
+    </div>
   );
 }

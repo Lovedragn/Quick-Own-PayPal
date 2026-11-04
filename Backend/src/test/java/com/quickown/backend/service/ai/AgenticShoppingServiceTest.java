@@ -3,7 +3,7 @@ package com.quickown.backend.service.ai;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.quickown.backend.catalog.MockProductCatalog;
+import com.quickown.backend.testutil.TestProductCatalogService;
 import com.quickown.backend.dto.shopping.ShoppingIntent;
 import com.quickown.backend.integration.channel3.Channel3CatalogClient;
 import com.quickown.backend.service.catalog.ProductCatalogService;
@@ -13,10 +13,7 @@ import org.junit.jupiter.api.Test;
 
 class AgenticShoppingServiceTest {
 
-  private final ProductCatalogService catalogue =
-      new ProductCatalogService(
-          new Channel3CatalogClient("", "https://api.trychannel3.com"),
-          new MockProductCatalog());
+  private final ProductCatalogService catalogue = new TestProductCatalogService();
 
   @Test
   void filtersByBudgetAndRanksUsingCatalogueBackedFeatureMatches() {
@@ -127,8 +124,7 @@ class AgenticShoppingServiceTest {
 
     private FallbackRecordingCatalogue() {
       super(
-          new Channel3CatalogClient("", "https://api.trychannel3.com"),
-          new MockProductCatalog());
+          new Channel3CatalogClient("", "https://api.trychannel3.com"));
     }
 
     @Override
@@ -206,8 +202,7 @@ class AgenticShoppingServiceTest {
   private static final class AccessoryRecordingCatalogue extends ProductCatalogService {
     private AccessoryRecordingCatalogue() {
       super(
-          new Channel3CatalogClient("", "https://api.trychannel3.com"),
-          new MockProductCatalog());
+          new Channel3CatalogClient("", "https://api.trychannel3.com"));
     }
 
     @Override
@@ -261,8 +256,7 @@ class AgenticShoppingServiceTest {
 
     private RecordingCatalogue() {
       super(
-          new Channel3CatalogClient("", "https://api.trychannel3.com"),
-          new MockProductCatalog());
+          new Channel3CatalogClient("", "https://api.trychannel3.com"));
     }
 
     @Override
