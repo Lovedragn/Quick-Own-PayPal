@@ -57,7 +57,6 @@ public class AgenticShoppingService {
   }
 
   public ShoppingRecommendationResponse recommend(String customerMessage) {
-    // ###not useful rgt now: Gemini prompt conversion bypassed, raw input directly to Channel3
     // ShoppingIntent intent = intentInterpreter.interpret(customerMessage);
     String rawQuery = customerMessage != null ? customerMessage.trim() : "";
     ShoppingIntent intent =

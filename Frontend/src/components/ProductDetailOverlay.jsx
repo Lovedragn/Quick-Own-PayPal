@@ -145,7 +145,7 @@ export default function ProductDetailOverlay({
     ? selectedOptions[channel3SizeOption.name] || ""
     : selectedSize;
 
-  // Dynamic Size calculation fallback based on product attributes / category
+  // Size calculation from product options
   const { sizes, sizeType } = useMemo(() => {
     if (channel3SizeOption) return { sizes: [], sizeType: "" };
     if (Array.isArray(product.sizes) && product.sizes.length > 0) {
@@ -154,59 +154,6 @@ export default function ProductDetailOverlay({
     if (Array.isArray(product.sizeOptions) && product.sizeOptions.length > 0) {
       return { sizes: product.sizeOptions, sizeType: "Options" };
     }
-
-    const nameLower = (product.name || "").toLowerCase();
-    const catLower = (product.category || "").toLowerCase();
-
-    const isFootwear =
-      nameLower.includes("shoe") ||
-      nameLower.includes("sneaker") ||
-      nameLower.includes("runner") ||
-      nameLower.includes("nitro") ||
-      nameLower.includes("boot") ||
-      nameLower.includes("slide") ||
-      catLower.includes("shoe") ||
-      catLower.includes("footwear") ||
-      catLower.includes("sneaker");
-    if (isFootwear) {
-      return {
-        sizes: ["6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "12"],
-        sizeType: "US Men / Women",
-      };
-    }
-
-    const isApparel =
-      nameLower.includes("shirt") ||
-      nameLower.includes("t-shirt") ||
-      nameLower.includes("tee") ||
-      nameLower.includes("hoodie") ||
-      nameLower.includes("jacket") ||
-      nameLower.includes("jersey") ||
-      nameLower.includes("pants") ||
-      nameLower.includes("shorts") ||
-      catLower.includes("clothing") ||
-      catLower.includes("apparel");
-    if (isApparel) {
-      return {
-        sizes: ["XS", "S", "M", "L", "XL", "2XL"],
-        sizeType: "Standard Sizing",
-      };
-    }
-
-    const isTech =
-      nameLower.includes("phone") ||
-      nameLower.includes("iphone") ||
-      nameLower.includes("ipad") ||
-      nameLower.includes("macbook") ||
-      nameLower.includes("laptop") ||
-      nameLower.includes("ssd");
-    if (isTech) {
-      return {
-        sizes: ["128GB", "256GB", "512GB", "1TB"],
-        sizeType: "Capacity",
-      };
-    }
-
     return { sizes: [], sizeType: "" };
   }, [product, channel3SizeOption]);
 

@@ -3,19 +3,14 @@ package com.quickown.backend.ai.tool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.quickown.backend.catalog.MockProductCatalog;
 import com.quickown.backend.dto.product.ProductResult;
-import com.quickown.backend.integration.channel3.Channel3CatalogClient;
-import com.quickown.backend.service.catalog.ProductCatalogService;
+import com.quickown.backend.testutil.TestProductCatalogService;
 import org.junit.jupiter.api.Test;
 
 class ProductSearchToolTest {
 
   private final ProductSearchTool tool =
-      new ProductSearchTool(
-          new ProductCatalogService(
-              new Channel3CatalogClient("", "https://api.trychannel3.com"),
-              new MockProductCatalog()));
+      new ProductSearchTool(new TestProductCatalogService());
 
   @Test
   void toolReturnsOnlyInStockProductsWhenFilterIsTrue() {
@@ -41,7 +36,7 @@ class ProductSearchToolTest {
   }
 
   @Test
-  void usesMockCatalogueWhenChannel3KeyIsNotConfigured() {
+  void usesCatalogueWhenSearching() {
     var results = tool.searchProducts("Samsung smartphones", false);
 
     assertEquals(2, results.size());
