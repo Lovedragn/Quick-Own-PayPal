@@ -3,12 +3,10 @@ package com.quickown.backend.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.quickown.backend.catalog.MockProductCatalog;
 import com.quickown.backend.dto.shopping.ShoppingIntent;
 import com.quickown.backend.dto.shopping.ShoppingRecommendationRequest;
-import com.quickown.backend.integration.channel3.Channel3CatalogClient;
 import com.quickown.backend.service.ai.AgenticShoppingService;
-import com.quickown.backend.service.catalog.ProductCatalogService;
+import com.quickown.backend.testutil.TestProductCatalogService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -16,10 +14,7 @@ class AgenticShoppingControllerTest {
 
   @Test
   void returnsStructuredRecommendationsForFrontend() {
-    var catalogue =
-        new ProductCatalogService(
-            new Channel3CatalogClient("", "https://api.trychannel3.com"),
-            new MockProductCatalog());
+    var catalogue = new TestProductCatalogService();
     var intent =
         new ShoppingIntent(
             "wireless headphones", "headphones", List.of("noise cancellation"),
