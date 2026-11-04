@@ -72,9 +72,12 @@ export default function ProductCard({
   onCheckout,
   checkingOut,
   onOpenDetail,
+  onAddToCart,
+  isLiked = false,
+  onToggleLike,
   index = 0,
 }) {
-  const [liked, setLiked] = useState(false);
+  const liked = isLiked;
   const [compared, setCompared] = useState(false);
 
   const product = recommendation.product;
@@ -145,7 +148,7 @@ export default function ProductCard({
                 rounded="full"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setLiked((prev) => !prev);
+                  if (onToggleLike && product?.productId) onToggleLike(product.productId);
                 }}
                 ariaLabel="Add to wishlist"
                 title="Add to wishlist"
@@ -286,7 +289,7 @@ export default function ProductCard({
                   rounded="full"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setLiked((prev) => !prev);
+                    if (onToggleLike && product?.productId) onToggleLike(product.productId);
                   }}
                   ariaLabel="Add to wishlist"
                   title="Add to wishlist"
@@ -505,24 +508,37 @@ export default function ProductCard({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCheckout(recommendation, selected, quantity);
-                  }}
-                  disabled={checkingOut || !selected}
-                  className="font-cal w-full py-2.5 px-3 rounded-none bg-[#0070BA] hover:bg-[#005ea6] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs disabled:opacity-60 disabled:cursor-wait cursor-pointer"
-                >
-                  <svg className="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
-                    <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.27 5.92-7.15 5.92H10.19c-.43 0-.79.31-.86.73l-.97 5.17a.64.64 0 0 1-.63.52H4.6c-.4 0-.7-.36-.63-.75L6.94 3.71A1.1 1.1 0 0 1 8.02 2.8h6.42c2.73 0 4.67.62 5.627 2.188z" />
-                  </svg>
-                  <span>
-                    {checkingOut
-                      ? "Locking Order…"
-                      : `PayPal · ${formatPrice(selected.price * quantity, selected.currency)}`}
-                  </span>
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onAddToCart) onAddToCart(recommendation, selected, quantity);
+                    }}
+                    className="font-cal py-2.5 px-3 rounded-none border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs transition-all shadow-xs cursor-pointer flex-shrink-0"
+                    title="Add to Cart"
+                  >
+                    + Cart
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCheckout(recommendation, selected, quantity);
+                    }}
+                    disabled={checkingOut || !selected}
+                    className="font-cal flex-1 py-2.5 px-3 rounded-none bg-[#0070BA] hover:bg-[#005ea6] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs disabled:opacity-60 disabled:cursor-wait cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
+                      <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.27 5.92-7.15 5.92H10.19c-.43 0-.79.31-.86.73l-.97 5.17a.64.64 0 0 1-.63.52H4.6c-.4 0-.7-.36-.63-.75L6.94 3.71A1.1 1.1 0 0 1 8.02 2.8h6.42c2.73 0 4.67.62 5.627 2.188z" />
+                    </svg>
+                    <span className="truncate">
+                      {checkingOut
+                        ? "Locking…"
+                        : `PayPal · ${formatPrice(selected.price * quantity, selected.currency)}`}
+                    </span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
