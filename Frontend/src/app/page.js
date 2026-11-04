@@ -1,12 +1,13 @@
 "use client";
 
 import IconButton from "@/components/ui/icon-button";
-
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ProductCard from "@/components/ProductCard";
 import ProductDetailOverlay from "@/components/ProductDetailOverlay";
+import { useCartPreference, useLikesPreference } from "@/lib/usePreferences";
+import { getStoredPagination, saveStoredPagination } from "@/lib/storage";
 import {
   Search,
   Sparkles,
@@ -28,6 +29,10 @@ import {
   ChevronDown,
   ArrowUpRight,
   Store,
+  ShoppingCart,
+  Heart,
+  Trash2,
+  X,
 } from "lucide-react";
 
 const API_BASE =
@@ -88,8 +93,6 @@ function getOffers(recommendation) {
   );
 }
 
-
-
 export default function Home() {
   const [query, setQuery] = useState("");
   const [recommendations, setRecommendations] = useState([]);
@@ -105,9 +108,82 @@ export default function Home() {
   const [detailVariantIndex, setDetailVariantIndex] = useState(0);
   const checkoutAttemptRef = useRef(null);
 
-  async function handleSearch(event) {
+  // User Preferences State with Local Storage
+  const [cart, saveCart] = useCartPreference();
+  const [likedIds, saveLikes] = useLikesPreference();
+  const [pagination, setPagination] = useState(() => getStoredPagination());
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isLikesOpen, setIsLikesOpen] = useState(false);
+
+  // Add Item to Cart
+  function handleAddToCart(recommendation, offer, quantity = 1) {
+    const product = recommendation?.product;
+    if (!product || !offer) return;
+
+    const existingIdx = cart.findIndex(
+      (item) =>
+        item.productId === product.productId &&
+        item.offerUrl === offer.productUrl
+    );
+
+    let nextCart;
+    if (existingIdx >= 0) {
+      nextCart = [...cart];
+      nextCart[existingIdx] = {
+        ...nextCart[existingIdx],
+        quantity: nextCart[existingIdx].quantity + quantity,
+      };
+    } else {
+      nextCart = [
+        ...cart,
+        {
+          productId: product.productId,
+          productName: product.name,
+          imageUrl: product.imageUrl,
+          brand: product.brand,
+          merchant: offer.merchant,
+          offerUrl: offer.productUrl,
+          price: offer.price,
+          currency: offer.currency,
+          quantity,
+          recommendation,
+          offer,
+        },
+      ];
+    }
+    saveCart(nextCart);
+  }
+
+  function handleRemoveFromCart(productId, offerUrl) {
+    const nextCart = cart.filter(
+      (item) => !(item.productId === productId && item.offerUrl === offerUrl)
+    );
+    saveCart(nextCart);
+  }
+
+  // Toggle Like Product
+  function handleToggleLike(productId) {
+    if (!productId) return;
+    const exists = likedIds.includes(productId);
+    const nextIds = exists
+      ? likedIds.filter((id) => id !== productId)
+      : [...likedIds, productId];
+    saveLikes(nextIds);
+  }
+
+  // Update Pagination Preference (persisted for future use)
+  function handlePaginationChange(newPagination) {
+    setPagination(newPagination);
+    saveStoredPagination(newPagination);
+  }
+
+  const cartTotalAmount = useMemo(() => {
+    return cart.reduce((sum, item) => sum + (Number(item.price) || 0) * item.quantity, 0);
+  }, [cart]);
+
+  async function handleSearch(event, overrideQuery) {
     if (event) event.preventDefault();
-    const message = query.trim();
+    const message = (overrideQuery || query).trim();
     if (!message) {
       setError("Describe what you are looking for first.");
       return;
@@ -167,7 +243,7 @@ export default function Home() {
   }
 
   async function beginCheckout(recommendation, offer, quantity) {
-    const product = recommendation.product;
+    const product = recommendation?.product;
     if (!product?.productId || !offer?.merchant || !offer?.productUrl) {
       setError("The selected product offer is missing required catalogue details.");
       return;
@@ -229,6 +305,50 @@ export default function Home() {
     }
   }
 
+  // Checkout whole cart with PayPal
+  async function beginCartCheckout() {
+    if (cart.length === 0) return;
+    setCheckoutProduct("cart");
+    setError("");
+
+    try {
+      const items = cart.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        merchantDomain: item.merchant,
+        quantity: item.quantity,
+        offerUrl: item.offerUrl,
+      }));
+
+      const idempotencyKey =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `quickown-cart-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const response = await fetch(`${API_BASE}/api/checkout/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({ items }),
+      });
+      const order = await readApiResponse(response);
+
+      if (!order.approvalUrl) {
+        throw new Error("PayPal did not return an approval link.");
+      }
+
+      window.location.assign(order.approvalUrl);
+    } catch (requestError) {
+      setError(
+        requestError.message ||
+          "Could not create the PayPal Sandbox order for cart. Please try again.",
+      );
+      setCheckoutProduct("");
+    }
+  }
+
   return (
     <div className="relative min-h-screen bg-[#F2FBEF] text-[#17270C] overflow-x-hidden">
       {/* Painterly background flourishes (CrawlerPal aesthetic) */}
@@ -259,8 +379,40 @@ export default function Home() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-cal font-medium bg-[#E8F4E2] text-[#3F7A2E] border border-[#D8E5D0]">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Wishlist / Liked Products Indicator */}
+            <button
+              type="button"
+              onClick={() => setIsLikesOpen(true)}
+              className="relative p-2 rounded-full hover:bg-[#E8F4E2] text-[#4A5A3F] hover:text-[#17270C] transition-colors cursor-pointer"
+              title="Liked Products"
+              aria-label="View liked products"
+            >
+              <Heart className={`w-5 h-5 ${likedIds.length > 0 ? "fill-rose-500 text-rose-500" : ""}`} />
+              {likedIds.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-rose-500 text-white font-cal text-[10px] flex items-center justify-center font-bold">
+                  {likedIds.length}
+                </span>
+              )}
+            </button>
+
+            {/* Cart Button */}
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              className="relative p-2 rounded-full hover:bg-[#E8F4E2] text-[#4A5A3F] hover:text-[#17270C] transition-colors cursor-pointer"
+              title="View Cart"
+              aria-label="View shopping cart"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {cart.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#0070BA] text-white font-cal text-[10px] flex items-center justify-center font-bold">
+                  {cart.reduce((total, item) => total + item.quantity, 0)}
+                </span>
+              )}
+            </button>
+
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-cal font-medium bg-[#E8F4E2] text-[#3F7A2E] border border-[#D8E5D0]">
               <span className="w-2 h-2 rounded-full bg-[#6FA956]" />
               PayPal Sandbox
             </span>
@@ -356,7 +508,7 @@ export default function Home() {
                       href="#results"
                       className="font-cal inline-flex items-center gap-1 font-medium hover:text-black transition-colors"
                     >
-                      <span>View all products</span>
+                      <span>View all products ({recommendations.length})</span>
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </a>
                     <div className="flex items-center gap-1.5">
@@ -390,6 +542,9 @@ export default function Home() {
                           onQuantityChange={changeQuantity}
                           onCheckout={beginCheckout}
                           checkingOut={checkoutProduct === productId}
+                          isLiked={likedIds.includes(productId)}
+                          onToggleLike={handleToggleLike}
+                          onAddToCart={handleAddToCart}
                           onOpenDetail={(rec, swatchIdx) => {
                             setDetailProduct(rec);
                             setDetailVariantIndex(swatchIdx || 0);
@@ -442,6 +597,169 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Cart Drawer / Modal */}
+      {isCartOpen && (
+        <div
+          className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-xs flex justify-end animate-fadeIn"
+          onClick={() => setIsCartOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col p-6 overflow-hidden border-l border-slate-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5 text-[#0070BA]" />
+                <h2 className="font-cal font-bold text-lg text-slate-900">Your Cart</h2>
+                <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-full font-bold text-slate-600">
+                  {cart.length}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(false)}
+                className="p-1 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-3">
+              {cart.length === 0 ? (
+                <div className="py-16 text-center text-slate-400 font-cal text-sm">
+                  Cart is empty! Find products and tap &quot;+ Cart&quot;.
+                </div>
+              ) : (
+                cart.map((item) => (
+                  <div
+                    key={`${item.productId}-${item.offerUrl}`}
+                    className="p-3 border border-slate-200 rounded-none flex items-center justify-between gap-3 bg-slate-50/50"
+                  >
+                    <div className="relative w-14 h-14 bg-white border border-slate-100 flex-shrink-0">
+                      {item.imageUrl ? (
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.productName || "Product"}
+                          fill
+                          unoptimized
+                          className="object-contain p-1"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center font-bold text-slate-300">
+                          Q
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] text-slate-500 font-cal truncate">{item.brand || item.merchant}</p>
+                      <h4 className="text-xs font-bold font-cal text-slate-900 truncate">{item.productName}</h4>
+                      <p className="text-xs font-bold text-[#0070BA] font-cal mt-0.5">
+                        {formatPrice(item.price, item.currency)} × {item.quantity}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFromCart(item.productId, item.offerUrl)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"
+                      title="Remove from cart"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {cart.length > 0 && (
+              <div className="pt-4 border-t border-slate-200 space-y-3">
+                <div className="flex items-center justify-between font-cal text-sm">
+                  <span className="text-slate-600">Total Price:</span>
+                  <span className="font-bold text-lg text-slate-900">
+                    {formatPrice(cartTotalAmount, cart[0]?.currency || "USD")}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={beginCartCheckout}
+                  disabled={checkoutProduct === "cart"}
+                  className="font-cal w-full py-3 bg-[#0070BA] hover:bg-[#005ea6] text-white font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                >
+                  <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
+                    <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.27 5.92-7.15 5.92H10.19c-.43 0-.79.31-.86.73l-.97 5.17a.64.64 0 0 1-.63.52H4.6c-.4 0-.7-.36-.63-.75L6.94 3.71A1.1 1.1 0 0 1 8.02 2.8h6.42c2.73 0 4.67.62 5.627 2.188z" />
+                  </svg>
+                  <span>{checkoutProduct === "cart" ? "Locking Order…" : "Pay Cart with PayPal"}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Liked / Wishlist Drawer */}
+      {isLikesOpen && (
+        <div
+          className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-xs flex justify-end animate-fadeIn"
+          onClick={() => setIsLikesOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col p-6 overflow-hidden border-l border-slate-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <Heart className="w-5 h-5 text-rose-500 fill-rose-500" />
+                <h2 className="font-cal font-bold text-lg text-slate-900">Liked Products</h2>
+                <span className="text-xs bg-rose-50 px-2 py-0.5 rounded-full font-bold text-rose-600">
+                  {likedIds.length}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLikesOpen(false)}
+                className="p-1 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-3">
+              {likedIds.length === 0 ? (
+                <div className="py-16 text-center text-slate-400 font-cal text-sm">
+                  No liked products yet. Tap the heart on any product card!
+                </div>
+              ) : (
+                likedIds.map((id) => {
+                  const match = recommendations.find((r) => r.product?.productId === id);
+                  return (
+                    <div
+                      key={id}
+                      className="p-3 border border-slate-200 rounded-none flex items-center justify-between gap-3 bg-slate-50/50"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-bold font-cal text-slate-900 truncate">
+                          {match?.product?.name || `Product #${id}`}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 font-cal">
+                          {match?.product?.brand || "Saved preference"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLike(id)}
+                        className="p-1.5 text-rose-500 hover:text-rose-700 transition-colors"
+                        title="Remove from wishlist"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Ticker Track (Below visible viewport - revealed on scroll) */}
       <div className="ticker" aria-label="Key features">
         <div className="ticker-track">
@@ -451,141 +769,24 @@ export default function Home() {
           </div>
           <div className="ticker-item">
             <span className="spark">✦</span>
-            <span>Live Stock Verification</span>
+            <span>Real-Time Merchant Stock Tracking</span>
           </div>
           <div className="ticker-item">
             <span className="spark">✦</span>
-            <span>One-Click PayPal Checkout</span>
+            <span>PayPal Sandbox Integration</span>
           </div>
           <div className="ticker-item">
             <span className="spark">✦</span>
-            <span>Guaranteed Price Locks</span>
+            <span>Sub-50ms Elastic Search Querying</span>
           </div>
         </div>
       </div>
 
-      {/* RAG-Style Pipeline Process Strip (CrawlerPal signature) */}
-      <section id="how-it-works" className="py-24 border-t border-[#D8E5D0]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="font-cal text-3xl sm:text-5xl text-[#17270C] font-bold mb-4 text-balance">
-              From natural language <span className="text-[#245A19]">to PayPal approval</span>.
-            </h2>
-            <p className="text-sm sm:text-base text-[#4A5A3F] max-w-[65ch] mx-auto text-pretty">
-              AI helps structure what you need, but the server deterministically revalidates
-              every offer and you still approve the final PayPal transaction.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#245A19]/30 transition-all">
-              <div>
-                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
-                  <Search className="w-4 h-4 text-[#245A19] flex-shrink-0" />
-                  <span>Understand Request</span>
-                </h3>
-                <p className="text-sm text-[#4A5A3F] leading-relaxed">
-                  Extracts your desired product specifications, budget limits, and preferred features from plain English.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#245A19]/30 transition-all">
-              <div>
-                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
-                  <Store className="w-4 h-4 text-[#245A19] flex-shrink-0" />
-                  <span>Scan Top Stores</span>
-                </h3>
-                <p className="text-sm text-[#4A5A3F] leading-relaxed">
-                  Searches verified retailers to compare current prices, real images, and genuine inventory.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#245A19]/30 transition-all">
-              <div>
-                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
-                  <Lock className="w-4 h-4 text-[#245A19] flex-shrink-0" />
-                  <span>Lock Best Price</span>
-                </h3>
-                <p className="text-sm text-[#4A5A3F] leading-relaxed">
-                  Confirms the exact offer price and merchant stock availability directly before checkout starts.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white border border-[#D8E5D0] shadow-xs flex flex-col justify-between hover:border-[#0070BA]/30 transition-all">
-              <div>
-                <h3 className="font-cal font-bold text-lg text-[#17270C] flex items-center gap-2.5 mb-2.5">
-                  <CreditCard className="w-4 h-4 text-[#0070BA] flex-shrink-0" />
-                  <span>Secure Checkout</span>
-                </h3>
-                <p className="text-sm text-[#4A5A3F] leading-relaxed">
-                  Review your items and complete payment in one click with official PayPal buyer protection.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats / Guarantees Section */}
-      <section id="stats" className="py-20 bg-[#E8F4E2]/70 border-t border-[#D8E5D0]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <h2 className="font-cal text-3xl sm:text-5xl text-[#17270C] font-bold mb-3 text-balance">
-              Guaranteed <span className="text-[#245A19]">authenticity</span>.
-            </h2>
-            <p className="text-sm sm:text-base text-[#4A5A3F] max-w-[65ch] mx-auto text-pretty">
-              Every merchant offer is verified in real time from retailer inventory. Zero guesswork.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-8 rounded-2xl bg-[#FBFEF9] border border-[#D8E5D0] shadow-xs">
-              <div className="font-serif text-5xl font-normal text-[#17270C] mb-3">
-                100<span className="italic text-[#245A19]">%</span>
-              </div>
-              <h3 className="font-cal font-bold text-lg text-[#17270C] mb-1">
-                Live Store Verification
-              </h3>
-              <p className="text-sm text-[#4A5A3F] max-w-[65ch] text-pretty">
-                Prices are re-verified with retailer servers in real-time before checkout is generated.
-              </p>
-            </div>
-
-            <div className="p-8 rounded-2xl bg-[#FBFEF9] border border-[#D8E5D0] shadow-xs">
-              <div className="font-serif text-5xl font-normal text-[#17270C] mb-3">
-                0<span className="italic text-[#245A19]">x</span>
-              </div>
-              <h3 className="font-cal font-bold text-lg text-[#17270C] mb-1">
-                Fabricated Prices
-              </h3>
-              <p className="text-sm text-[#4A5A3F] max-w-[65ch] text-pretty">
-                Every price, store listing, and product link comes from actual merchant data.
-              </p>
-            </div>
-
-            <div className="p-8 rounded-2xl bg-[#FBFEF9] border border-[#D8E5D0] shadow-xs">
-              <div className="font-serif text-5xl font-normal text-[#17270C] mb-3">
-                <span className="italic text-[#245A19]">✓</span>
-              </div>
-              <h3 className="font-cal font-bold text-lg text-[#17270C] mb-1">
-                Buyer Protection
-              </h3>
-              <p className="text-sm text-[#4A5A3F] max-w-[65ch] text-pretty">
-                Official PayPal checkout session with full transaction verification and buyer protection.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-12 border-t border-[#D8E5D0] bg-[#FBFEF9]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#002125] text-[#F2FBEF] flex items-center justify-center font-bold text-xs">
+      {/* Bottom Footer */}
+      <footer className="w-full bg-[#E5F2E0] border-t border-[#D8E5D0] py-6 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-[#002125] text-[#F2FBEF] flex items-center justify-center font-bold text-xs">
               q
             </div>
             <span className="font-cal font-bold text-base text-[#17270C]">
@@ -618,6 +819,9 @@ export default function Home() {
           onCheckout={beginCheckout}
           checkingOut={checkoutProduct === detailProduct.product?.productId}
           initialVariantIndex={detailVariantIndex}
+          isLiked={likedIds.includes(detailProduct.product?.productId)}
+          onToggleLike={handleToggleLike}
+          onAddToCart={handleAddToCart}
           onClose={() => setDetailProduct(null)}
         />
       )}
