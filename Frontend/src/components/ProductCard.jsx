@@ -175,7 +175,7 @@ export default function ProductCard({
         </div>
 
         {/* Content Section Below Image - flex-1 flex flex-col justify-between keeps amount ALWAYS at bottom */}
-        <div className="bg-white px-3.5 pt-2.5 pb-2.5 flex-1 flex flex-col justify-between border-t border-[#EAECEF]">
+        <div className="bg-white px-3.5 pt-3 pb-3 sm:pb-3.5 flex-1 flex flex-col justify-between border-t border-[#EAECEF]">
           <div>
             {colorValues.length > 0 && (
               <div className="flex items-center gap-1.5 mb-2 px-0.5 overflow-x-auto py-0.5 scrollbar-none">
@@ -228,17 +228,17 @@ export default function ProductCard({
             )}
 
             <div className="px-0.5">
-              <p className="font-cal text-xs text-[#6B7280] font-medium tracking-wide">
-                {product.brand || product.category || "Puma"}
+              <p className="font-cal text-xs text-[#6B7280] font-medium tracking-wide truncate" title={product.brand || product.category || "Puma"}>
+                {product.brand || product.category}
               </p>
-              <h3 className="font-cal text-sm font-bold text-[#111827] line-clamp-2 mt-0.5 tracking-tight">
+              <h3 className="font-cal text-sm font-bold text-[#111827] truncate mt-0.5 tracking-tight" title={product.name}>
                 {product.name}
               </h3>
             </div>
           </div>
 
           {/* Amount ALWAYS pinned at bottom */}
-          <div className="px-0.5 mt-auto pt-2 flex items-baseline justify-between gap-1">
+          <div className="px-0.5 mt-auto pt-2.5 pb-1 sm:pb-1.5 flex items-baseline justify-between gap-1">
             <span className="text-xl sm:text-2xl lg:text-[26px] font-bold text-[#111827] font-cal tracking-tight leading-none block">
               {formatPrice(selected?.price || lowestPrice, selected?.currency || "USD")}
             </span>
@@ -279,18 +279,6 @@ export default function ProductCard({
             <div>
               <div className="relative aspect-square w-full bg-slate-50/60 border border-slate-100 flex items-center justify-center overflow-hidden mb-2.5">
               <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-10">
-                <IconButton
-                  icon={Scale}
-                  active={compared}
-                  activeVariant="primary"
-                  rounded="full"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCompared((prev) => !prev);
-                  }}
-                  ariaLabel="Compare product"
-                  title="Compare product"
-                />
                 <IconButton
                   icon={Heart}
                   active={liked}
@@ -369,10 +357,10 @@ export default function ProductCard({
             )}
 
               <div className="px-0.5">
-                <p className="font-cal text-xs text-[#6B7280] font-medium tracking-wide">
-                  {product.brand || product.category || "Puma"}
+                <p className="font-cal text-xs text-[#6B7280] font-medium tracking-wide truncate" title={product.brand || product.category || "Puma"}>
+                  {product.brand || product.category}
                 </p>
-                <h3 className="font-cal text-sm font-bold text-[#111827] line-clamp-2 mt-0.5 tracking-tight">
+                <h3 className="font-cal text-sm font-bold text-[#111827] truncate mt-0.5 tracking-tight" title={product.name}>
                   {product.name}
                 </h3>
               </div>
@@ -390,10 +378,19 @@ export default function ProductCard({
           <div className="flex flex-col justify-between h-full space-y-3 sm:border-l sm:border-slate-100 sm:pl-4">
             <div>
               {/* Header Action Bar */}
-              <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-100">
-                <span className="font-cal text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Store Comparison
-                </span>
+              <div className="flex items-center justify-end gap-1.5 mb-2 pb-2 border-b border-slate-100">
+                <IconButton
+                  icon={Scale}
+                  active={compared}
+                  activeVariant="primary"
+                  rounded="full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCompared((prev) => !prev);
+                  }}
+                  ariaLabel="Compare product"
+                  title="Compare product"
+                />
                 <IconButton
                   icon={ArrowUpRight}
                   onClick={(e) => {
@@ -402,17 +399,18 @@ export default function ProductCard({
                   }}
                   ariaLabel="View full details"
                   title="View full details & all stores"
+                  rounded="full"
                 />
               </div>
 
               {/* Stores Stack */}
               <div className="space-y-1.5">
-                <div className="font-cal flex items-center justify-between text-[13px] font-semibold text-slate-700">
+                <div className="font-cal flex items-center text-[13px] font-semibold text-slate-700">
                   <span className="flex items-center gap-1.5">
                     <Store className="w-3.5 h-3.5 text-[#0070BA]" />
                     <span>Store Offers ({offers.length})</span>
                   </span>
-                  <span className="text-xs text-emerald-600 font-cal">Verified</span>
+                  
                 </div>
 
                 <div className="flex flex-col gap-1.5 max-h-52 overflow-y-auto pr-0.5">

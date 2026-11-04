@@ -30,7 +30,9 @@ public class PayPalWebhookVerificationClient {
       @Value("${paypal.webhook-id:}") String webhookId) {
     this.authService = authService;
     this.baseUrl =
-        baseUrl == null ? "https://api-m.sandbox.paypal.com" : baseUrl.replaceAll("/+$", "");
+        baseUrl == null || baseUrl.isBlank()
+            ? "https://api-m.sandbox.paypal.com"
+            : baseUrl.replaceAll("[;/\\s]+$", "");
     this.webhookId = webhookId == null ? "" : webhookId.trim();
     this.httpClient =
         HttpClient.newBuilder()
