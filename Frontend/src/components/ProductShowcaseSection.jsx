@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   ChartContainer,
   ChartTooltip,
@@ -27,42 +27,46 @@ import {
   Search,
 } from "lucide-react";
 
-// Shopping Evolution: from manual browsing steps to autonomous AI agent shopping
+// Shopping Evolution: Quick-Own Shopping vs Manual Shopping benchmark
 const SHOPPING_EVOLUTION_DATA = [
   {
-    stage: "Manual Tab Browsing",
-    timeSeconds: 1110,
-    savingsPercent: 0,
-    label: "18.5m / 0% saved",
+    stage: "Today",
+    quickOwn: 1.5,
+    manual: 4.5,
+    quickOwnTime: "1.2s",
+    manualTime: "18.5m",
   },
   {
     stage: "Price Portal Search",
-    timeSeconds: 288,
-    savingsPercent: 8,
-    label: "4.8m / 8% saved",
+    quickOwn: 10,
+    manual: 7,
+    quickOwnTime: "1.2s",
+    manualTime: "4.8m",
   },
   {
     stage: "Browser Extensions",
-    timeSeconds: 120,
-    savingsPercent: 14,
-    label: "2.0m / 14% saved",
+    quickOwn: 14,
+    manual: 6,
+    quickOwnTime: "1.2s",
+    manualTime: "2.0m",
   },
   {
     stage: "Quick-Own Agent",
-    timeSeconds: 1.2,
-    savingsPercent: 24,
-    label: "1.2s / 24% saved",
+    quickOwn: 32,
+    manual: 4,
+    quickOwnTime: "1.2s",
+    manualTime: "18.5m",
   },
 ];
 
 const evolutionChartConfig = {
-  timeSeconds: {
-    label: "Time Spent (Seconds)",
-    color: "#EF4444",
+  quickOwn: {
+    label: "Quick-Own Shopping",
+    color: "#0070BA",
   },
-  savingsPercent: {
-    label: "Price Savings Rate (%)",
-    color: "#/* 16 */A34A",
+  manual: {
+    label: "Manual Shopping",
+    color: "#EF4444",
   },
 };
 
@@ -103,84 +107,51 @@ const PRODUCT_CARDS = [
 
 export default function ProductShowcaseSection() {
   const [activeMetricTab, setActiveMetricTab] = useState("savings"); // "savings" | "speed"
+  const [chartKey, setChartKey] = useState(0);
+  const chartSectionRef = useRef(null);
+  const [hasAnimated, setHasAnimated] = useState(false);
+
+  useEffect(() => {
+    const target = chartSectionRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !hasAnimated) {
+            setChartKey((prev) => prev + 1);
+            setHasAnimated(true);
+          }
+        });
+      },
+      { threshold: 0.2 },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasAnimated]);
 
   return (
     <section
       id="product-features"
-      className="relative w-full bg-white border-b border-zinc-200 pt-8 sm:pt-10 pb-12 sm:pb-/* 16 */"
+      className="relative w-full bg-white border-b border-zinc-200 pt-8 sm:pt-10"
       aria-label="Product Features and Benchmarks"
     >
-      {/* Section Header */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="max-w-3xl mb-8 sm:mb-10">
-          <h2 className="font-cal font-bold text-3xl sm:text-4xl text-zinc-950 tracking-tight leading-[1.15]">
-            Built for autonomous shopping. <br />
-            <span className="text-[#/* 16 */A34A] font-serif italic">
-              Proven to save cash and hours.
-            </span>
-          </h2>
-          <p className="mt-4 text-base sm:text-lg text-zinc-600 leading-relaxed">
-            Quick-Own combines Channel3’s 100M+ retail graph, Elasticsearch
-            hybrid indexing, and PayPal v2 checkout into a seamless autonomous
-            purchasing experience.
-          </p>
-        </div>
-      </div>
-
-      {/* 4 Cards Grid - Merged edge-to-edge with the long side vertical borders, razor sharp */}
-      <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 border-y border-zinc-200 border-x-0 divide-y md:divide-y-0 md:divide-x divide-zinc-200 bg-white rounded-none shadow-none">
-        {PRODUCT_CARDS.map((card, idx) => {
-          return (
-            <div
-              key={idx}
-              className="bg-white hover:bg-zinc-50/50 transition-colors flex flex-col justify-between rounded-none"
-            >
-              <div className="p-6 pb-3">
-                <div className="flex items-center justify-end mb-3">
-                  <span className="font-cal font-semibold text-sm tracking-wider text-zinc-900 uppercase">
-                    {card.tag}
-                  </span>
-                </div>
-                <h3 className="font-cal font-bold text-xl text-zinc-900 leading-snug">
-                  {card.title}
-                </h3>
-                <p className="text-sm text-zinc-500 font-mono mt-0.5">
-                  {card.subtitle}
-                </p>
-              </div>
-
-              <div className="p-6 pt-1 pb-6 flex-1 flex flex-col justify-between">
-                <p className="text-sm text-zinc-600 leading-relaxed mb-4">
-                  {card.description}
-                </p>
-                <ul className="space-y-1.5 pt-3 border-t border-zinc-100">
-                  {card.highlights.map((h, i) => (
-                    <li
-                      key={i}
-                      className="flex items-start gap-1.5 text-sm text-zinc-700"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-[#/* 16 */A34A] flex-shrink-0 mt-0.5" />
-                      <span>{h}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
       {/* Section: Savings & Speed Benchmark Line Chart - Merged with side vertical borders, razor sharp */}
-      <div id="savings-speed" className="w-full scroll-mt-20">
+      <div
+        id="savings-speed"
+        ref={chartSectionRef}
+        className="w-full scroll-mt-20"
+      >
         <div className="w-full bg-white border-y border-zinc-200 border-x-0 rounded-none shadow-none overflow-hidden">
           <div className="p-6 sm:p-8 pb-6 border-b border-zinc-200">
             <div className="max-w-3xl">
               <h3 className="font-cal font-bold text-3xl sm:text-4xl text-zinc-950 tracking-tight leading-[1.15]">
                 Speed & Savings Rate
               </h3>
-              <p className="mt-4 text-base sm:text-lg text-zinc-600 leading-relaxed">
-                How moving from manual multi-tab searching to autonomous agentic
-                shopping slashes latency and compounds money saved.
+              <p className="mt-3 text-base sm:text-lg text-zinc-600 leading-relaxed">
+                Quick-Own autonomous agent vs. manual multi-tab shopping across
+                catalog depth and checkout.
               </p>
             </div>
           </div>
@@ -235,12 +206,13 @@ export default function ProductShowcaseSection() {
 
           <div className="p-6 sm:p-8">
             {/* Shadcn Line Chart Container */}
-            <div className="w-full h-[320px]">
+            <div className="w-full h-[380px] sm:h-[420px]">
               <ChartContainer
                 config={evolutionChartConfig}
-                className="h-[320px] w-full"
+                className="h-[380px] sm:h-[420px] w-full"
               >
                 <LineChart
+                  key={chartKey}
                   data={SHOPPING_EVOLUTION_DATA}
                   margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
                 >
@@ -253,102 +225,102 @@ export default function ProductShowcaseSection() {
                     dataKey="stage"
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: "#475569", fontSize: 14, fontWeight: 500 }}
+                    interval={0}
+                    tick={{ fill: "#475569", fontSize: 13, fontWeight: 500 }}
                     dy={8}
                   />
                   <YAxis
-                    yAxisId="left"
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: "#/* 16 */A34A", fontSize: 14 }}
+                    tick={{ fill: "#64748B", fontSize: 13 }}
                     unit="%"
-                    domain={[0, 30]}
-                  />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: "#EF4444", fontSize: 14 }}
-                    unit="s"
-                    domain={[0, 1200]}
+                    domain={[0, 35]}
+                    ticks={[0, 7, 14, 21, 28, 35]}
                   />
                   <ChartTooltip
                     content={
                       <ChartTooltipContent
-                        formatter={(value, name) => {
-                          if (name === "savingsPercent") {
-                            return (
-                              <div className="flex items-center justify-between gap-4">
-                                <span className="text-zinc-500">
-                                  Savings Rate:
-                                </span>
-                                <span className="font-bold text-[#/* 16 */A34A]">
-                                  {value}%
+                        formatter={(value, name, item) => {
+                          const isQuickOwn =
+                            name === "quickOwn" ||
+                            name === "Quick-Own Shopping";
+                          const color = isQuickOwn ? "#0070BA" : "#EF4444";
+                          const label = isQuickOwn
+                            ? "Quick-Own Shopping"
+                            : "Manual Shopping";
+                          const time = isQuickOwn
+                            ? item?.payload?.quickOwnTime
+                            : item?.payload?.manualTime;
+
+                          return (
+                            <div className="flex items-center justify-between gap-6 py-1 w-full min-w-[200px]">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: color }}
+                                />
+                                <span className="font-medium text-zinc-800 text-xs">
+                                  {label}
                                 </span>
                               </div>
-                            );
-                          }
-                          return (
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="text-zinc-500">Latency:</span>
-                              <span className="font-bold text-[#EF4444]">
-                                {value}s
-                              </span>
+                              <div className="text-right">
+                                <span
+                                  className="font-bold text-sm block"
+                                  style={{ color }}
+                                >
+                                  {value}% saved
+                                </span>
+                                {time && (
+                                  <span className="text-[11px] text-zinc-400 font-mono block">
+                                    {time} avg
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           );
                         }}
                       />
                     }
                   />
+                  {/* Quick-Own Shopping - Blue Line */}
                   <Line
-                    yAxisId="left"
                     type="monotone"
-                    dataKey="savingsPercent"
-                    stroke="#/* 16 */A34A"
-                    strokeWidth={3}
+                    dataKey="quickOwn"
+                    stroke="#0070BA"
+                    strokeWidth={3.5}
                     dot={{
                       r: 5,
-                      fill: "#/* 16 */A34A",
+                      fill: "#0070BA",
                       strokeWidth: 2,
                       stroke: "#FFFFFF",
                     }}
-                    activeDot={{ r: 7 }}
-                    name="savingsPercent"
+                    activeDot={{ r: 7, fill: "#0070BA" }}
+                    name="Quick-Own Shopping"
+                    isAnimationActive={true}
+                    animationDuration={2000}
+                    animationEasing="ease-in-out"
                   />
+                  {/* Manual Shopping - Red Curved Line */}
                   <Line
-                    yAxisId="right"
                     type="monotone"
-                    dataKey="timeSeconds"
+                    dataKey="manual"
                     stroke="#EF4444"
-                    strokeWidth={3}
-                    strokeDasharray="4 4"
+                    strokeWidth={3.5}
                     dot={{
                       r: 5,
                       fill: "#EF4444",
                       strokeWidth: 2,
                       stroke: "#FFFFFF",
                     }}
-                    activeDot={{ r: 7 }}
-                    name="timeSeconds"
+                    activeDot={{ r: 7, fill: "#EF4444" }}
+                    name="Manual Shopping"
+                    isAnimationActive={true}
+                    animationDuration={2000}
+                    animationEasing="ease-in-out"
                   />
                 </LineChart>
               </ChartContainer>
             </div>
-          </div>
-
-          <div className="p-4 px-6 sm:px-8 bg-zinc-50 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-zinc-600 font-mono rounded-none">
-            <div className="flex items-center gap-6">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#/* 16 */A34A]" />
-                Money Saved (% discount against market retail)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#EF4444]" />
-                Search Time (Seconds elapsed to final checkout link)
-              </span>
-            </div>
-            <span>Manual Browser Hunting &rarr; Autonomous Agent Shopping</span>
           </div>
         </div>
       </div>
