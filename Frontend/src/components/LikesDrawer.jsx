@@ -35,7 +35,9 @@ export default function LikesDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 hover:bg-slate-100 rounded-md transition-colors"
+            className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+            aria-label="Close liked products"
+            title="Close liked products"
           >
             <X className="w-5 h-5 text-slate-500" />
           </button>

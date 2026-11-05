@@ -65,8 +65,9 @@ export default function OrdersDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
-            title="Close"
+            className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+            aria-label="Close ordered products"
+            title="Close ordered products"
           >
             <X className="w-5 h-5 text-slate-500" />
           </button>

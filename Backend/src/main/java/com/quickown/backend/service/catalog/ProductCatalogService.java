@@ -67,6 +67,22 @@ public class ProductCatalogService {
     return Map.copyOf(result);
   }
 
+  public ProductResult findById(String productId) {
+    if (productId == null || productId.isBlank()) {
+      return null;
+    }
+    if (channel3Client != null && channel3Client.isConfigured()) {
+      try {
+        ProductResult result = channel3Client.getProduct(productId);
+        if (result != null) {
+          return result;
+        }
+      } catch (Exception ignored) {
+      }
+    }
+    return null;
+  }
+
   public List<ProductResult> search(String query, boolean inStockOnly) {
     return search(query, inStockOnly, marketCurrency);
   }
@@ -102,7 +118,7 @@ public class ProductCatalogService {
       if (addProviderResults(
           providerResults,
           "Channel3",
-          () -> channel3Client.search(query, inStockOnly),
+          () -> channel3Client.search(query, inStockOnly, searchCurrency),
           failedProviders)) {
         successfulCount++;
       }
@@ -186,7 +202,7 @@ public class ProductCatalogService {
               product.description(),
               product.imageUrl(),
               eligibleOffers.stream().anyMatch(offer -> isInStock(offer.availability())),
-              List.copyOf(eligibleOffers), product.variants());
+              List.copyOf(eligibleOffers), product.variants(), product.images());
 
       String key = comparisonKey(normalized);
       ProductResult previous = merged.get(key);
@@ -229,7 +245,7 @@ public class ProductCatalogService {
         first.imageUrl() == null ? second.imageUrl() : first.imageUrl(),
         offers.stream().anyMatch(offer -> isInStock(offer.availability())),
         List.copyOf(offers),
-        first.variants() != null ? first.variants() : second.variants());
+        first.variants() != null ? first.variants() : second.variants(), first.images() != null && !first.images().isEmpty() ? first.images() : second.images());
   }
 
   private String comparisonKey(ProductResult product) {

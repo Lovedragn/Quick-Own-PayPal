@@ -10,6 +10,9 @@ const calSans = localFont({
 
 export const metadata = {
   title: "Quick-Own | AI Shopping Agent",
+  icons: {
+    icon: "/favicon.ico",
+  },
   description:
     "Describe what you need, compare catalogue-backed merchant offers, and approve checkout with PayPal Sandbox.",
 };
