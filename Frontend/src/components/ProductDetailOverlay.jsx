@@ -7,24 +7,31 @@ import {
   isValueOutOfStock,
   isValueMissing,
 } from "@/lib/variants";
+import {
+  fetchProductSampleImages,
+  getCachedProductImages,
+} from "@/lib/productDetailService";
 
 import Image from "next/image";
-
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   X,
   Store,
   ExternalLink,
-  ShieldCheck,
   Check,
   Heart,
   Scale,
-  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Tag,
+  Info,
+  ShoppingCart,
 } from "lucide-react";
 
 function formatPrice(value, currency) {
-  if (value === null || value === undefined || !currency) return "Price unavailable";
+  if (value === null || value === undefined || !currency)
+    return "Price unavailable";
   const amount = Number(value);
   if (!Number.isFinite(amount)) return "Price unavailable";
   try {
@@ -36,6 +43,14 @@ function formatPrice(value, currency) {
   } catch {
     return `${currency} ${amount.toFixed(2)}`;
   }
+}
+
+function cleanDescription(text) {
+  if (!text || typeof text !== "string") return "";
+  return text
+    .replace(/<[^>]*>?/gm, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function getOffers(recommendation) {
@@ -56,7 +71,7 @@ function getOffers(recommendation) {
       offer.price !== null &&
       offer.price !== undefined &&
       offer.currency &&
-      offer.productUrl
+      offer.productUrl,
   );
 }
 
@@ -77,12 +92,38 @@ export default function ProductDetailOverlay({
   const product = recommendation?.product;
   const offers = useMemo(() => getOffers(recommendation), [recommendation]);
   const [selectedOfferIdx, setSelectedOfferIdx] = useState(
-    selectedIndex >= 0 && selectedIndex < offers.length ? selectedIndex : 0
+    selectedIndex >= 0 && selectedIndex < offers.length ? selectedIndex : 0,
   );
   const [selectedVariant, setSelectedVariant] = useState(initialVariantIndex);
   const [selectedSize, setSelectedSize] = useState("");
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-    const [compared, setCompared] = useState(false);
+  const [compared, setCompared] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [justAddedToCart, setJustAddedToCart] = useState(false);
+  const [isZooming, setIsZooming] = useState(false);
+  const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
+  const [fetchedImages, setFetchedImages] = useState(() => {
+    const cached = getCachedProductImages(product?.productId);
+    if (cached && cached.length) return cached;
+    return Array.isArray(product?.images) ? product.images : [];
+  });
+
+  // Lazy-load sample images if not already present on product
+  useEffect(() => {
+    if (!product?.productId) return;
+    const initialImages = Array.isArray(product.images) ? product.images : [];
+    if (initialImages.length > 1) return;
+    // Fetch from Channel3 API on detail open
+    let isSubscribed = true;
+    fetchProductSampleImages(product.productId).then((data) => {
+      if (isSubscribed && data?.images?.length) {
+        setFetchedImages(data.images);
+      }
+    });
+    return () => {
+      isSubscribed = false;
+    };
+  }, [product?.productId, product?.images]);
 
   // Close on Escape key
   useEffect(() => {
@@ -92,9 +133,7 @@ export default function ProductDetailOverlay({
       }
     }
     window.addEventListener("keydown", handleKeyDown);
-    if (!product) return null;
-
-  return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   // Lock body scroll when overlay is active
@@ -105,21 +144,37 @@ export default function ProductDetailOverlay({
       document.body.style.overflow = originalOverflow;
     };
   }, []);
+
   const selectedOffer = offers[selectedOfferIdx] || offers[0];
 
   // Price calculations
   const prices = offers.map((o) => Number(o.price)).filter(Number.isFinite);
-  const lowestPrice = prices.length > 0 ? Math.min(...prices) : Number(selectedOffer?.price || 0);
-  const highestPrice = prices.length > 0 ? Math.max(...prices) : Number(selectedOffer?.price || 0);
+  const lowestPrice =
+    prices.length > 0 ? Math.min(...prices) : Number(selectedOffer?.price || 0);
+  const highestPrice =
+    prices.length > 0 ? Math.max(...prices) : Number(selectedOffer?.price || 0);
   const hasDiscount = highestPrice > lowestPrice;
-  const originalPrice = hasDiscount ? highestPrice : Number(selectedOffer?.price || 0) * 1.15;
+  const originalPrice = hasDiscount
+    ? highestPrice
+    : Number(selectedOffer?.price || 0) * 1.15;
+  const discountPercent =
+    hasDiscount && highestPrice > 0
+      ? Math.round(
+          ((highestPrice - (selectedOffer?.price || lowestPrice)) /
+            highestPrice) *
+            100,
+        )
+      : null;
 
   // Variants calculation & normalization
-  const variantData = useMemo(() => normalizeProductVariants(product), [product]);
+  const variantData = useMemo(
+    () => normalizeProductVariants(product),
+    [product],
+  );
   const [userSelectedOptions, setUserSelectedOptions] = useState({});
   const selectedOptions = useMemo(
     () => ({ ...(variantData?.selectedMap || {}), ...userSelectedOptions }),
-    [variantData, userSelectedOptions]
+    [variantData, userSelectedOptions],
   );
 
   const colorOption = variantData.colorOption;
@@ -138,8 +193,7 @@ export default function ProductDetailOverlay({
     null;
 
   const previewColorValue =
-    (hoveredVariantIdx !== null ? colorValues[hoveredVariantIdx] : null) ||
-    activeColorValue;
+    hoveredVariantIdx !== null ? colorValues[hoveredVariantIdx] : null;
 
   const channel3SizeOption = variantData.sizeOption;
   const activeSizeLabel = channel3SizeOption
@@ -148,6 +202,7 @@ export default function ProductDetailOverlay({
 
   // Size calculation from product options
   const { sizes, sizeType } = useMemo(() => {
+    if (!product) return { sizes: [], sizeType: "" };
     if (channel3SizeOption) return { sizes: [], sizeType: "" };
     if (Array.isArray(product.sizes) && product.sizes.length > 0) {
       return { sizes: product.sizes, sizeType: "Options" };
@@ -158,12 +213,41 @@ export default function ProductDetailOverlay({
     return { sizes: [], sizeType: "" };
   }, [product, channel3SizeOption]);
 
-  const currentFeaturedImage =
-    previewColorValue?.imageUrl ||
-    previewColorValue?.thumbnailUrl ||
-    activeColorValue?.imageUrl ||
-    activeColorValue?.thumbnailUrl ||
-    product.imageUrl;
+  // Collect all unique sample images from variant swatches, fetched images, product images, and fallback
+  const galleryImages = useMemo(() => {
+    const list = [
+      previewColorValue?.imageUrl,
+      previewColorValue?.thumbnailUrl,
+      activeColorValue?.imageUrl,
+      activeColorValue?.thumbnailUrl,
+      ...(Array.isArray(fetchedImages) ? fetchedImages : []),
+      ...(Array.isArray(product?.images) ? product.images : []),
+      product?.imageUrl,
+    ].filter(Boolean);
+
+    // Deduplicate preserving order
+    return Array.from(new Set(list));
+  }, [previewColorValue, activeColorValue, fetchedImages, product]);
+
+  // Main featured image priority:
+  // 1. Swatch preview (if currently hovering color swatch)
+  // 2. Active gallery thumbnail selection
+  // 3. Active color value
+  // 4. Default product imageUrl
+  const currentFeaturedImage = useMemo(() => {
+    if (previewColorValue?.imageUrl || previewColorValue?.thumbnailUrl) {
+      return previewColorValue.imageUrl || previewColorValue.thumbnailUrl;
+    }
+    if (galleryImages.length > 0 && galleryImages[activeImageIndex]) {
+      return galleryImages[activeImageIndex];
+    }
+    return (
+      activeColorValue?.imageUrl ||
+      activeColorValue?.thumbnailUrl ||
+      product?.imageUrl ||
+      ""
+    );
+  }, [previewColorValue, galleryImages, activeImageIndex, activeColorValue, product]);
 
   const isSelectedVariantOutOfStock = useMemo(() => {
     if (!variantData.hasVariants) return false;
@@ -172,7 +256,9 @@ export default function ProductDetailOverlay({
     }
     if (channel3SizeOption) {
       const chosenSize = selectedOptions[channel3SizeOption.name];
-      const sizeVal = channel3SizeOption.values.find((v) => v.label === chosenSize);
+      const sizeVal = channel3SizeOption.values.find(
+        (v) => v.label === chosenSize,
+      );
       if (sizeVal && isValueOutOfStock(sizeVal)) {
         return true;
       }
@@ -180,12 +266,13 @@ export default function ProductDetailOverlay({
     return false;
   }, [variantData, activeColorValue, channel3SizeOption, selectedOptions]);
 
-  // Gallery angle thumbnails
-  const galleryImages = [
-    currentFeaturedImage,
-    product.imageUrl,
-    product.imageUrl,
-  ].filter(Boolean);
+  if (!product) return null;
+
+  // Additional details extraction
+  const rawDescription = cleanDescription(product.description);
+  const isDescriptionLong = rawDescription
+    ? rawDescription.length > 200
+    : false;
 
   return (
     <div
@@ -194,18 +281,22 @@ export default function ProductDetailOverlay({
     >
       {/* Modal Container */}
       <div
-        className="relative bg-white w-full max-w-5xl my-auto rounded-none shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[95vh]"
+        className="relative bg-white w-full max-w-5xl my-auto rounded-none shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[94vh] md:h-[88vh] max-h-[900px]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-[#FAFAFA]">
+        <div className="relative flex items-center justify-between px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-100 bg-[#FAFAFA] shrink-0">
           <IconButton
             icon={ArrowLeft}
             onClick={onClose}
-            ariaLabel="Back"
-            title="Back"
+            ariaLabel="Back to results"
+            title="Back to results"
             rounded="full"
           />
+
+          <span className="font-cal text-xs sm:text-sm uppercase tracking-wider text-slate-700 font-bold absolute left-1/2 -translate-x-1/2 pointer-events-none">
+            Product Overview
+          </span>
 
           <IconButton
             icon={X}
@@ -217,50 +308,66 @@ export default function ProductDetailOverlay({
         </div>
 
         {/* Modal Body: 2 Columns */}
-        <div className="p-4 sm:p-6 md:p-8 overflow-y-auto grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
-          
-          {/* Left Column: Image Gallery */}
-          <div className="md:col-span-6 flex flex-col items-center">
-            {/* Featured Image Canvas (Transparent - no gray box) */}
-            <div className="relative w-full aspect-square bg-transparent rounded-none flex items-center justify-center p-6 border border-slate-100 overflow-hidden">
-              {/* Floating Compare & Heart Buttons */}
-              <div className="absolute top-3 right-3 flex flex-col gap-1.5 z-10">
-                <IconButton
-                  icon={Scale}
-                  active={compared}
-                  activeVariant="primary"
-                  rounded="full"
-                  onClick={() => setCompared((prev) => !prev)}
-                  ariaLabel="Compare product"
-                  title="Compare product"
-                />
-                <IconButton
-                  icon={Heart}
-                  active={isLiked}
-                  activeVariant="rose"
-                  rounded="full"
-                  onClick={() => setLiked((prev) => !prev)}
-                  ariaLabel="Add to wishlist"
-                  title="Add to wishlist"
-                />
-              </div>
-
+        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+          {/* Left Column: Image Gallery (stays in view) */}
+          <div className="md:col-span-6 flex flex-col items-center justify-start p-4 sm:p-6 md:p-8 md:overflow-y-auto">
+            {/* Featured Image Canvas with Amazon-Style Hover Zoom Lens */}
+            <div
+              className={`relative w-full aspect-square bg-white rounded-none flex items-center justify-center p-6 border border-slate-100 overflow-hidden group select-none ${
+                isZooming ? "cursor-none" : "cursor-crosshair"
+              }`}
+              onMouseEnter={() => setIsZooming(true)}
+              onMouseLeave={() => setIsZooming(false)}
+              onMouseMove={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = Math.max(
+                  0,
+                  Math.min(100, ((e.clientX - rect.left) / rect.width) * 100),
+                );
+                const y = Math.max(
+                  0,
+                  Math.min(100, ((e.clientY - rect.top) / rect.height) * 100),
+                );
+                setZoomPos({ x, y });
+              }}
+            >
               {currentFeaturedImage ? (
-                <Image
-                  src={currentFeaturedImage}
-                  alt={product.name || "Product"}
-                  fill
-                  unoptimized
-                  className="object-contain p-6 transition-transform duration-300 hover:scale-105"
-                />
+                <>
+                  {/* Stable Base Image: always fully visible, unpadded so image reaches full canvas edges */}
+                  <div className="relative w-full h-full">
+                    <Image
+                      src={currentFeaturedImage}
+                      alt={product.name || "Product"}
+                      fill
+                      unoptimized
+                      className="object-contain"
+                    />
+                  </div>
+
+                  {/* Magnifier Glass Box following cursor: contains zoomed product image preview */}
+                  {isZooming && (
+                    <div
+                      className="absolute pointer-events-none w-60 h-40 -translate-x-1/2 -translate-y-1/2 rounded-lg border-1 border-slate-900/80 bg-white bg-no-repeat z-30 overflow-hidden"
+                      style={{
+                        left: `${zoomPos.x}%`,
+                        top: `${zoomPos.y}%`,
+                        backgroundImage: `url(${currentFeaturedImage})`,
+                        backgroundPosition: `${zoomPos.x}% ${zoomPos.y}%`,
+                        backgroundSize: "200%",
+                      }}
+                    />
+                  )}
+                </>
               ) : (
-                <div className="text-4xl font-cal text-slate-300 font-bold">Q</div>
+                <div className="text-4xl font-cal text-slate-300 font-bold">
+                  Q
+                </div>
               )}
             </div>
 
             {/* Thumbnail Gallery Strip */}
             {galleryImages.length > 1 && (
-              <div className="flex items-center gap-2 mt-3 w-full overflow-x-auto pb-1">
+              <div className="flex items-center gap-2 mt-4 w-full overflow-x-auto pb-1 scrollbar-none">
                 {galleryImages.map((img, idx) => (
                   <button
                     key={idx}
@@ -284,54 +391,116 @@ export default function ProductDetailOverlay({
                 ))}
               </div>
             )}
+
+            {/* Action Buttons Below Images: Heart, Compare, Cart */}
+            <div className="w-full mt-4 pt-3 border-t border-slate-100 flex items-center justify-center gap-3">
+              <IconButton
+                icon={Heart}
+                active={isLiked}
+                activeVariant="rose"
+                rounded="full"
+                className="w-10 h-10 [&_svg]:w-4.5 [&_svg]:h-4.5"
+                onClick={() => {
+                  if (onToggleLike && product?.productId) {
+                    onToggleLike(product.productId);
+                  }
+                }}
+                ariaLabel="Add to wishlist"
+                title="Add to wishlist"
+              />
+              <IconButton
+                icon={Scale}
+                active={compared}
+                activeVariant="primary"
+                rounded="full"
+                className="w-10 h-10 [&_svg]:w-4.5 [&_svg]:h-4.5"
+                onClick={() => setCompared((prev) => !prev)}
+                ariaLabel="Compare product"
+                title="Compare product"
+              />
+              <IconButton
+                icon={justAddedToCart ? Check : ShoppingCart}
+                active={justAddedToCart}
+                activeVariant="primary"
+                rounded="full"
+                className="w-10 h-10 [&_svg]:w-4.5 [&_svg]:h-4.5"
+                disabled={isSelectedVariantOutOfStock}
+                onClick={() => {
+                  if (onAddToCart && selectedOffer) {
+                    onAddToCart(recommendation, selectedOffer, quantity);
+                    setJustAddedToCart(true);
+                    setTimeout(() => setJustAddedToCart(false), 1200);
+                  }
+                }}
+                ariaLabel="Add to cart"
+                title={
+                  isSelectedVariantOutOfStock ? "Out of stock" : "Add to cart"
+                }
+              />
+            </div>
           </div>
 
-          {/* Right Column: Details, Variants, Size & Checkout */}
-          <div className="md:col-span-6 flex flex-col justify-between space-y-4">
-            <div>
-              {/* Brand */}
-              <p className="font-cal text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">
-                {product.brand || product.category || "Puma"}
-              </p>
+          {/* Right Column: Independently Scrollable Details */}
+          <div className="md:col-span-6 flex flex-col h-full min-h-0 p-4 sm:p-6 md:p-8 bg-white">
+            {/* Scrollable Content Container */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 sm:pr-2.5 space-y-4">
+              {/* Product Header: Brand & Title */}
+              <div>
+                <p className="font-cal text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">
+                  {product.brand || product.category || "Exclusive"}
+                </p>
 
-              {/* Product Title */}
-              <h2 className="font-cal text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-snug">
-                {product.name}
-              </h2>
+                <h2 className="font-cal text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-snug">
+                  {product.name}
+                </h2>
 
-              {/* Price Row */}
-              <div className="flex items-baseline gap-2 mt-1.5">
-                <span className="text-2xl sm:text-3xl font-bold text-slate-900 font-cal tracking-tight">
-                  {formatPrice(selectedOffer?.price || lowestPrice, selectedOffer?.currency || "USD")}
-                </span>
-                {originalPrice > (selectedOffer?.price || lowestPrice) && (
-                  <span className="text-xs text-slate-400 line-through font-cal">
-                    {formatPrice(originalPrice, selectedOffer?.currency || "USD")}
+                {/* Price Row */}
+                <div className="flex items-baseline gap-2.5 mt-2">
+                  <span className="text-2xl sm:text-3xl font-bold text-slate-900 font-cal tracking-tight">
+                    {formatPrice(
+                      selectedOffer?.price || lowestPrice,
+                      selectedOffer?.currency || "USD",
+                    )}
                   </span>
-                )}
+                  {originalPrice > (selectedOffer?.price || lowestPrice) && (
+                    <span className="text-sm text-slate-400 line-through font-cal">
+                      {formatPrice(
+                        originalPrice,
+                        selectedOffer?.currency || "USD",
+                      )}
+                    </span>
+                  )}
+                  {discountPercent && discountPercent > 0 ? (
+                    <span className="text-xs font-cal font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5">
+                      Save {discountPercent}%
+                    </span>
+                  ) : null}
+                </div>
               </div>
 
               {/* Colorway Selection */}
               {colorValues.length > 0 && (
-                <div className="mt-3.5 pt-3 border-t border-slate-100">
-                  <div className="text-[14px] text-slate-600 mb-1.5 flex items-center justify-between">
+                <div className="pt-3 border-t border-slate-100">
+                  <div className="text-[14px] text-slate-600 mb-2 flex items-center justify-between">
                     <div>
                       <span className="font-cal font-semibold text-slate-800">
                         {colorOption?.name || "Color"}:{" "}
                       </span>
                       <span>{activeColorLabel}</span>
                     </div>
-                    {activeColorValue && isValueOutOfStock(activeColorValue) && (
-                      <span className="text-[11px] font-bold text-rose-600 font-cal bg-rose-50 px-2 py-0.5 border border-rose-200">
-                        Out of Stock
-                      </span>
-                    )}
+                    {activeColorValue &&
+                      isValueOutOfStock(activeColorValue) && (
+                        <span className="text-[11px] font-bold text-rose-600 font-cal bg-rose-50 px-2 py-0.5 border border-rose-200">
+                          Out of Stock
+                        </span>
+                      )}
                   </div>
 
                   {/* Circular Variant Swatches */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none">
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
                     {colorValues.map((v, idx) => {
-                      const isSelected = activeColorLabel === v.label || selectedVariant === idx;
+                      const isSelected =
+                        activeColorLabel === v.label || selectedVariant === idx;
                       const isOutOfStock = isValueOutOfStock(v);
                       const isMissing = isValueMissing(v);
                       return (
@@ -350,7 +519,7 @@ export default function ProductDetailOverlay({
                               }));
                             }
                           }}
-                          className={`relative w-7 h-7 rounded-full overflow-hidden border bg-[#F6F7F9] transition-all cursor-pointer flex-shrink-0 flex items-center justify-center ${
+                          className={`relative w-9 h-9 rounded-full overflow-hidden border bg-[#F6F7F9] transition-all cursor-pointer flex-shrink-0 flex items-center justify-center ${
                             isSelected
                               ? "ring-1.5 ring-offset-1 ring-black border-black scale-105 shadow-xs"
                               : "border-slate-300 hover:border-slate-400 opacity-80 hover:opacity-100"
@@ -386,17 +555,21 @@ export default function ProductDetailOverlay({
 
               {/* Dynamic Size Selector: Channel3 UCP or category fallback */}
               {channel3SizeOption && channel3SizeOption.values.length > 0 ? (
-                <div className="mt-3.5 pt-3 border-t border-slate-100">
-                  <div className="flex items-center justify-between text-[14px] mb-1.5">
+                <div className="pt-3 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-[14px] mb-2">
                     <span className="font-cal font-semibold text-slate-800">
-                      {channel3SizeOption.name} {activeSizeLabel ? `· ${activeSizeLabel}` : ""}
+                      {channel3SizeOption.name}{" "}
+                      {activeSizeLabel ? `· ${activeSizeLabel}` : ""}
                     </span>
-                    <span className="text-slate-400 font-cal text-xs">Options</span>
+                    <span className="text-slate-400 font-cal text-xs">
+                      Options
+                    </span>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-0.5">
                     {channel3SizeOption.values.map((v) => {
-                      const isSelected = selectedOptions[channel3SizeOption.name] === v.label;
+                      const isSelected =
+                        selectedOptions[channel3SizeOption.name] === v.label;
                       const isOutOfStock = isValueOutOfStock(v);
                       const isMissing = isValueMissing(v);
                       return (
@@ -425,12 +598,14 @@ export default function ProductDetailOverlay({
                   </div>
                 </div>
               ) : sizes.length > 0 ? (
-                <div className="mt-3.5 pt-3 border-t border-slate-100">
-                  <div className="flex items-center justify-between text-[14px] mb-1.5">
+                <div className="pt-3 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-[14px] mb-2">
                     <span className="font-cal font-semibold text-slate-800">
                       Size {selectedSize ? `· ${selectedSize}` : ""}
                     </span>
-                    <span className="text-slate-400 font-cal text-xs">{sizeType}</span>
+                    <span className="text-slate-400 font-cal text-xs">
+                      {sizeType}
+                    </span>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-0.5">
@@ -454,10 +629,13 @@ export default function ProductDetailOverlay({
 
               {/* Other Options */}
               {variantData.otherOptions.map((opt) => (
-                <div key={opt.name} className="mt-3.5 pt-3 border-t border-slate-100">
-                  <div className="flex items-center justify-between text-[14px] mb-1.5">
+                <div key={opt.name} className="pt-3 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-[14px] mb-2">
                     <span className="font-cal font-semibold text-slate-800">
-                      {opt.name} {selectedOptions[opt.name] ? `· ${selectedOptions[opt.name]}` : ""}
+                      {opt.name}{" "}
+                      {selectedOptions[opt.name]
+                        ? `· ${selectedOptions[opt.name]}`
+                        : ""}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -488,15 +666,122 @@ export default function ProductDetailOverlay({
                 </div>
               ))}
 
+              {/* About Product / Description */}
+              {rawDescription ? (
+                <div className="pt-3 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-[14px] mb-1.5">
+                    <span className="font-cal font-semibold text-slate-800">
+                      Product Description
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-600 leading-relaxed font-sans">
+                    <p
+                      className={
+                        !isDescriptionExpanded && isDescriptionLong
+                          ? "line-clamp-3"
+                          : ""
+                      }
+                    >
+                      {rawDescription}
+                    </p>
+                    {isDescriptionLong && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setIsDescriptionExpanded((prev) => !prev)
+                        }
+                        className="font-cal text-[#0070BA] hover:underline font-semibold mt-1 text-[11px] flex items-center gap-1 cursor-pointer"
+                      >
+                        {isDescriptionExpanded ? (
+                          <>
+                            <span>Show less</span>
+                            <ChevronUp className="w-3 h-3" />
+                          </>
+                        ) : (
+                          <>
+                            <span>Read full description</span>
+                            <ChevronDown className="w-3 h-3" />
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Product Specifications Table */}
+              <div className="pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between text-[14px] mb-2">
+                  <span className="font-cal font-semibold text-slate-800">
+                    Specifications & Details
+                  </span>
+                </div>
+                <div className="border border-slate-200 divide-y divide-slate-100 text-xs">
+                  <div className="grid grid-cols-2 p-2 bg-[#FAFAFA]">
+                    <span className="text-slate-500 font-cal">Brand</span>
+                    <span className="text-slate-900 font-medium font-sans">
+                      {product.brand || "Standard"}
+                    </span>
+                  </div>
+                  {product.category && (
+                    <div className="grid grid-cols-2 p-2">
+                      <span className="text-slate-500 font-cal">Category</span>
+                      <span className="text-slate-900 font-medium font-sans">
+                        {product.category}
+                      </span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 p-2 bg-[#FAFAFA]">
+                    <span className="text-slate-500 font-cal">
+                      Availability
+                    </span>
+                    <span className="text-slate-900 font-medium font-sans flex items-center gap-1">
+                      <span
+                        className={`w-2 h-2 rounded-full ${product.inStock !== false ? "bg-emerald-500" : "bg-amber-500"}`}
+                      />
+                      {product.inStock !== false ? "In Stock" : "Limited stock"}
+                    </span>
+                  </div>
+                  {product.productId && (
+                    <div className="grid grid-cols-2 p-2">
+                      <span className="text-slate-500 font-cal">
+                        Product ID / SKU
+                      </span>
+                      <span className="text-slate-700 font-mono text-[11px] truncate">
+                        {product.productId}
+                      </span>
+                    </div>
+                  )}
+                  {offers.length > 0 && (
+                    <div className="grid grid-cols-2 p-2 bg-[#FAFAFA]">
+                      <span className="text-slate-500 font-cal">
+                        Retailer Stores
+                      </span>
+                      <span className="text-slate-900 font-medium font-sans">
+                        {offers.length} stores compared
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Merchant Comparison Table: "Available at" */}
-              <div className="mt-3.5 pt-3 border-t border-slate-100">
-                <div className="flex items-center justify-between text-[14px] mb-1.5">
-                  <span className="font-cal font-semibold text-slate-800">Available at ({offers.length} stores)</span>
+              <div className="pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between text-[14px] mb-2">
+                  <span className="font-cal font-semibold text-slate-800">
+                    Available at ({offers.length} stores)
+                  </span>
+                  <span className="text-[11px] font-cal text-slate-400">
+                    Select store to buy from
+                  </span>
                 </div>
 
-                <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
                   {offers.map((offer, idx) => {
                     const isSelected = idx === selectedOfferIdx;
+                    const isBestPrice =
+                      Number(offer.price) === lowestPrice && offers.length > 1;
+
                     return (
                       <div
                         key={`${offer.merchant}-${idx}`}
@@ -506,15 +791,15 @@ export default function ProductDetailOverlay({
                             onSelectOffer(product.productId, idx);
                           }
                         }}
-                        className={`p-2 rounded-none border text-xs transition-all cursor-pointer flex items-center justify-between ${
+                        className={`p-2.5 rounded-none border text-xs transition-all cursor-pointer flex items-center justify-between ${
                           isSelected
                             ? "bg-blue-50/90 border-[#0070BA] ring-1 ring-[#0070BA]"
                             : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                         }`}
                       >
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                           <div
-                            className={`w-4 h-4 rounded-none flex items-center justify-center text-[9px] font-bold ${
+                            className={`w-6 h-6 rounded-none flex items-center justify-center text-[10px] font-bold ${
                               isSelected
                                 ? "bg-[#0070BA] text-white"
                                 : "bg-slate-100 text-slate-700 border border-slate-200"
@@ -523,17 +808,24 @@ export default function ProductDetailOverlay({
                             {offer.merchant?.charAt(0).toUpperCase() || "S"}
                           </div>
                           <div className="flex flex-col">
-                            <span className="font-cal font-semibold text-slate-800 text-[11px]">
-                              {offer.merchant}
-                            </span>
-                            <span className="text-[9px] text-slate-400">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-cal font-semibold text-slate-800 text-xs">
+                                {offer.merchant}
+                              </span>
+                              {isBestPrice && (
+                                <span className="text-[9px] font-cal font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2">
+                                  Best Price
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400">
                               {offer.availability || "In stock"}
                             </span>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-900 font-cal text-[11px]">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 font-cal text-xs sm:text-sm">
                             {formatPrice(offer.price, offer.currency)}
                           </span>
                           {offer.productUrl && (
@@ -543,9 +835,9 @@ export default function ProductDetailOverlay({
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
                               className="text-slate-400 hover:text-[#0070BA] p-0.5 transition-colors"
-                              title="Open store listing"
+                              title="Open store listing in new tab"
                             >
-                              <ExternalLink className="w-3 h-3" />
+                              <ExternalLink className="w-3.5 h-3.5" />
                             </a>
                           )}
                         </div>
@@ -556,17 +848,22 @@ export default function ProductDetailOverlay({
               </div>
             </div>
 
-            {/* Bottom Actions: Quantity + PayPal Instant Checkout */}
-            <div className="pt-3 border-t border-slate-200 space-y-2.5">
+            {/* Bottom Actions: Quantity + PayPal Instant Checkout (Pinned at bottom of right column) */}
+            <div className="shrink-0 pt-3 border-t border-slate-200 space-y-2.5 mt-auto bg-white">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-cal text-slate-500 font-medium">Quantity:</span>
+                <span className="text-[11px] font-cal text-slate-500 font-medium">
+                  Quantity:
+                </span>
                 <div className="flex items-center border border-slate-300 rounded-none bg-slate-50 text-xs font-bold">
                   <button
                     type="button"
                     className="px-2.5 py-0.5 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
                     onClick={() =>
                       onQuantityChange &&
-                      onQuantityChange(product.productId, Math.max(1, quantity - 1))
+                      onQuantityChange(
+                        product.productId,
+                        Math.max(1, quantity - 1),
+                      )
                     }
                   >
                     -
@@ -579,7 +876,10 @@ export default function ProductDetailOverlay({
                     className="px-2.5 py-0.5 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
                     onClick={() =>
                       onQuantityChange &&
-                      onQuantityChange(product.productId, Math.min(10, quantity + 1))
+                      onQuantityChange(
+                        product.productId,
+                        Math.min(10, quantity + 1),
+                      )
                     }
                   >
                     +
@@ -588,22 +888,14 @@ export default function ProductDetailOverlay({
               </div>
 
               {selectedOffer && (
-                <div className="flex gap-2">
+                <div>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (onAddToCart) onAddToCart(recommendation, selectedOffer, quantity);
-                    }}
-                    disabled={isSelectedVariantOutOfStock}
-                    className="font-cal py-2.5 px-4 rounded-none border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs transition-all shadow-xs cursor-pointer disabled:opacity-50"
-                  >
-                    Add to Cart
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onCheckout(recommendation, selectedOffer, quantity)}
+                    onClick={() =>
+                      onCheckout(recommendation, selectedOffer, quantity)
+                    }
                     disabled={checkingOut || isSelectedVariantOutOfStock}
-                    className={`font-cal flex-1 py-2.5 px-3 rounded-none font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                    className={`font-cal w-full py-2.5 px-3 rounded-none font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
                       isSelectedVariantOutOfStock
                         ? "bg-slate-200 text-slate-500 cursor-not-allowed border border-slate-300"
                         : "bg-[#0070BA] hover:bg-[#005ea6] text-white disabled:opacity-60 disabled:cursor-wait"
@@ -613,11 +905,16 @@ export default function ProductDetailOverlay({
                       <span>Out of Stock</span>
                     ) : (
                       <>
-                        <svg className="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
+                        <svg
+                          className="w-3.5 h-3.5 fill-white"
+                          viewBox="0 0 24 24"
+                        >
                           <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.27 5.92-7.15 5.92H10.19c-.43 0-.79.31-.86.73l-.97 5.17a.64.64 0 0 1-.63.52H4.6c-.4 0-.7-.36-.63-.75L6.94 3.71A1.1 1.1 0 0 1 8.02 2.8h6.42c2.73 0 4.67.62 5.627 2.188z" />
                         </svg>
                         <span>
-                          {checkingOut ? "Locking Order…" : "Pay via PayPal"}
+                          {checkingOut
+                            ? "Locking Order…"
+                            : `Pay via PayPal · ${formatPrice((selectedOffer.price || 0) * quantity, selectedOffer.currency)}`}
                         </span>
                       </>
                     )}
@@ -625,11 +922,9 @@ export default function ProductDetailOverlay({
                 </div>
               )}
             </div>
-
           </div>
         </div>
       </div>
     </div>
   );
 }
-

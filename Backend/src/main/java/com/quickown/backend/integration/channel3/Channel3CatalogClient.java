@@ -52,6 +52,10 @@ public class Channel3CatalogClient {
   }
 
   public List<ProductResult> search(String query, boolean inStockOnly) {
+    return search(query, inStockOnly, null);
+  }
+
+  public List<ProductResult> search(String query, boolean inStockOnly, String currency) {
     if (!isConfigured()) {
       throw new IllegalStateException("Channel3 API key is not configured.");
     }
@@ -60,7 +64,8 @@ public class Channel3CatalogClient {
     }
 
     try {
-      String requestBody = objectMapper.writeValueAsString(new SearchRequest(query.trim(), 10));
+      SearchConfig config = new SearchConfig("agentic", currency != null && !currency.isBlank() && !"ANY".equalsIgnoreCase(currency) ? currency.trim().toUpperCase(Locale.ROOT) : null);
+      String requestBody = objectMapper.writeValueAsString(new SearchRequest(query.trim(), 10, config));
 
       HttpRequest request =
           HttpRequest.newBuilder()
@@ -104,6 +109,37 @@ public class Channel3CatalogClient {
     }
   }
 
+  public ProductResult getProduct(String productId) {
+    if (!isConfigured() || productId == null || productId.isBlank()) {
+      return null;
+    }
+
+    try {
+      HttpRequest request =
+          HttpRequest.newBuilder()
+              .uri(URI.create(baseUrl + "/v1/products/" + productId.trim()))
+              .timeout(Duration.ofSeconds(15))
+              .header("x-api-key", apiKey)
+              .GET()
+              .build();
+
+      HttpResponse<String> response =
+          httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+      if (response.statusCode() < 200 || response.statusCode() >= 300) {
+        return null;
+      }
+
+      JsonNode root = objectMapper.readTree(response.body());
+      return toProductResult(root, false);
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      return null;
+    } catch (Exception exception) {
+      return null;
+    }
+  }
+
   private ProductResult toProductResult(JsonNode product, boolean inStockOnly) {
     String id = text(product, "id");
     String title = firstNonBlank(text(product, "title"), text(product, "name"));
@@ -140,6 +176,7 @@ public class Channel3CatalogClient {
 
     boolean inStock = offers.stream().anyMatch(offer -> isInStock(offer.availability()));
     ProductVariants variants = parseVariants(product.path("variants"));
+    List<String> images = allImageUrls(product.path("images"));
     return new ProductResult(
         "Channel3",
         id,
@@ -150,7 +187,8 @@ public class Channel3CatalogClient {
         imageUrl,
         inStock,
         List.copyOf(offers),
-        variants);
+        variants,
+        images);
   }
 
   private ProductVariants parseVariants(JsonNode variantsNode) {
@@ -294,6 +332,22 @@ public class Channel3CatalogClient {
     return null;
   }
 
+  private List<String> allImageUrls(JsonNode images) {
+    if (!images.isArray()) {
+      return List.of();
+    }
+    List<String> list = new ArrayList<>();
+    for (JsonNode image : images) {
+      String cleanedUrl = text(image, "cleaned_url");
+      String url = text(image, "url");
+      String selected = (cleanedUrl != null && !cleanedUrl.isBlank()) ? cleanedUrl : url;
+      if (selected != null && !selected.isBlank() && !list.contains(selected)) {
+        list.add(selected);
+      }
+    }
+    return List.copyOf(list);
+  }
+
   private String text(JsonNode node, String field) {
     JsonNode value = node.path(field);
     return value.isMissingNode() || value.isNull() || value.isContainerNode()
@@ -320,5 +374,7 @@ public class Channel3CatalogClient {
         || normalized.equals("limitedavailability");
   }
 
-  private record SearchRequest(String query, int limit) {}
+  private record SearchConfig(String mode, String currency) {}
+
+  private record SearchRequest(String query, int limit, SearchConfig config) {}
 }

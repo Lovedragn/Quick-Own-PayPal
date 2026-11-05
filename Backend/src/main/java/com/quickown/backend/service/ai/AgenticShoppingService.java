@@ -117,7 +117,7 @@ public class AgenticShoppingService {
               product.imageUrl(),
               eligibleOffers.stream().anyMatch(offer -> isInStock(offer.availability())),
               List.copyOf(eligibleOffers),
-              product.variants());
+              product.variants(), product.images());
       candidates.add(new Candidate(filteredProduct, selectedOffer, matchedFeatures));
     }
 

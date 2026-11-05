@@ -100,11 +100,41 @@ export function normalizeProductVariants(product) {
 
     const colorOption =
       rawOptions.find((opt) => /colou?r/i.test(opt.name)) || null;
+
+    // Normalize values inside colorOption to support both camelCase and snake_case thumbnailUrl
+    const normalizedColorOption = colorOption
+      ? {
+          ...colorOption,
+          values: (colorOption.values || []).map((v) => ({
+            ...v,
+            thumbnailUrl: v.thumbnailUrl || v.thumbnail_url || v.imageUrl || v.image_url,
+            imageUrl: v.imageUrl || v.image_url || v.thumbnailUrl || v.thumbnail_url,
+          })),
+        }
+      : null;
+
     const sizeOption =
       rawOptions.find((opt) => /size|capacity|storage|memory/i.test(opt.name)) || null;
     const otherOptions = rawOptions.filter(
       (opt) => opt !== colorOption && opt !== sizeOption
     );
+
+    // If product has no color option in variants (e.g. only storage/specs),
+    // treat the product itself as a single color/style variant so it displays its product image in a swatch
+    const effectiveColorOption =
+      normalizedColorOption || {
+        name: "Color",
+        values: [
+          {
+            label: product.color || product.name || "Default",
+            exists: true,
+            available: product.inStock !== false ? "InStock" : "OutOfStock",
+            thumbnailUrl: product.imageUrl || "",
+            imageUrl: product.imageUrl || "",
+            id: product.productId || "default-var",
+          },
+        ],
+      };
 
     return {
       hasVariants: true,
@@ -112,7 +142,7 @@ export function normalizeProductVariants(product) {
       options: rawOptions,
       selectedMap,
       selectedList: rawSelected,
-      colorOption,
+      colorOption: effectiveColorOption,
       sizeOption,
       otherOptions,
       legacyVariants: [],
@@ -149,13 +179,28 @@ export function normalizeProductVariants(product) {
     };
   }
 
+  // 3. Fallback: Product has only single default variant/image
+  const defaultLabel = product.color || product.name || "Default";
+  const defaultSingleValue = {
+    label: defaultLabel,
+    exists: true,
+    available: product.inStock !== false ? "InStock" : "OutOfStock",
+    thumbnailUrl: product.imageUrl || "",
+    imageUrl: product.imageUrl || "",
+    id: product.productId || "default-var",
+  };
+  const fallbackColorOption = {
+    name: "Color",
+    values: [defaultSingleValue],
+  };
+
   return {
     hasVariants: false,
     isUcp: false,
-    options: [],
-    selectedMap: {},
-    selectedList: [],
-    colorOption: null,
+    options: [fallbackColorOption],
+    selectedMap: { Color: defaultLabel },
+    selectedList: [{ name: "Color", label: defaultLabel }],
+    colorOption: fallbackColorOption,
     sizeOption: null,
     otherOptions: [],
     legacyVariants: [],

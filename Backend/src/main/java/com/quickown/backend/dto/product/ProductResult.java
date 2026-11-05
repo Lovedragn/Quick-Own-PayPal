@@ -15,7 +15,22 @@ public record ProductResult(
     String imageUrl,
     boolean inStock,
     List<ProductOffer> offers,
-    Object variants) {
+    Object variants,
+    List<String> images) {
+
+  public ProductResult(
+      String source,
+      String productId,
+      String name,
+      String brand,
+      String category,
+      String description,
+      String imageUrl,
+      boolean inStock,
+      List<ProductOffer> offers,
+      Object variants) {
+    this(source, productId, name, brand, category, description, imageUrl, inStock, offers, variants, null);
+  }
 
   public ProductResult(
       String source,
@@ -27,6 +42,7 @@ public record ProductResult(
       String imageUrl,
       boolean inStock,
       List<ProductOffer> offers) {
-    this(source, productId, name, brand, category, description, imageUrl, inStock, offers, null);
+    this(source, productId, name, brand, category, description, imageUrl, inStock, offers, null, null);
   }
 }
+

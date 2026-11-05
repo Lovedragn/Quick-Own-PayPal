@@ -377,18 +377,25 @@ public class CheckoutService {
     for (CheckoutItem requested : requestedItems) {
       validateItem(requested);
 
-      List<ProductResult> candidates = productCatalogService.search(requested.productName(), true, "ANY");
+      ProductResult product = null;
+      if (requested.productId() != null && !requested.productId().isBlank()) {
+        product = productCatalogService.findById(requested.productId());
+      }
 
-      ProductResult product =
-          candidates.stream()
-              .filter(
-                  candidate -> candidate.name().equalsIgnoreCase(requested.productName().trim()))
-              .filter(candidate -> requested.productId().equals(candidate.productId()))
-              .findFirst()
-              .orElseThrow(
-                  () ->
-                      new IllegalArgumentException(
-                          "Product is no longer available: " + requested.productName()));
+      if (product == null) {
+        List<ProductResult> candidates = productCatalogService.search(requested.productName(), true, "ANY");
+
+        product =
+            candidates.stream()
+                .filter(
+                    candidate -> candidate.name().equalsIgnoreCase(requested.productName().trim()))
+                .filter(candidate -> requested.productId().equals(candidate.productId()))
+                .findFirst()
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            "Product is no longer available: " + requested.productName()));
+      }
 
       List<ProductOffer> merchantOffers =
           product.offers() == null

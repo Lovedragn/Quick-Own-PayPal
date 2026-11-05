@@ -33,6 +33,13 @@ export default function ProductResultsSection({
 
   return (
     <div id="results" className="w-full mt-8 mb-12">
+      {/* Title above products */}
+      <div className="mb-6">
+        <h2 className="font-cal font-bold text-3xl sm:text-4xl text-zinc-950 tracking-tight">
+          Products
+        </h2>
+      </div>
+
       {/* Top Bar matching Channel3 demo: View All & Directional Controls */}
       <div className="flex items-center justify-between mb-3 text-xs text-slate-700 px-0.5">
         <a
