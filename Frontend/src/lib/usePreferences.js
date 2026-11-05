@@ -6,6 +6,10 @@ import {
   saveStoredLikedProducts,
   getStoredPagination,
   saveStoredPagination,
+  getStoredQuantities,
+  saveStoredQuantities,
+  getStoredOrders,
+  saveStoredOrders,
 } from "@/lib/storage";
 
 function subscribeCart(callback) {
@@ -24,6 +28,26 @@ function subscribeLikes(callback) {
   window.addEventListener("storage", callback);
   return () => {
     window.removeEventListener("quickown_likes_updated", callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function subscribeQuantities(callback) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("quickown_quantities_updated", callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener("quickown_quantities_updated", callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function subscribeOrders(callback) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("quickown_orders_updated", callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener("quickown_orders_updated", callback);
     window.removeEventListener("storage", callback);
   };
 }
@@ -70,3 +94,44 @@ export function useLikesPreference() {
   return [likes, saveStoredLikedProducts];
 }
 
+let emptyQuantities = {};
+export function useQuantitiesPreference() {
+  const quantitiesJson = useSyncExternalStore(
+    subscribeQuantities,
+    () => {
+      if (typeof window === "undefined") return "{}";
+      return localStorage.getItem("quickown_quantities") || "{}";
+    },
+    () => "{}"
+  );
+
+  let quantities = emptyQuantities;
+  try {
+    quantities = JSON.parse(quantitiesJson);
+  } catch {
+    quantities = emptyQuantities;
+  }
+
+  return [quantities, saveStoredQuantities];
+}
+
+let emptyOrders = [];
+export function useOrdersPreference() {
+  const ordersJson = useSyncExternalStore(
+    subscribeOrders,
+    () => {
+      if (typeof window === "undefined") return "[]";
+      return localStorage.getItem("quickown_orders") || "[]";
+    },
+    () => "[]"
+  );
+
+  let orders = emptyOrders;
+  try {
+    orders = JSON.parse(ordersJson);
+  } catch {
+    orders = emptyOrders;
+  }
+
+  return [orders, saveStoredOrders];
+}

@@ -9,5 +9,11 @@ public record VariantOptionValue(
     Boolean exists,
     String available,
     @JsonProperty("thumbnail_url") String thumbnailUrl,
-    @JsonProperty("product_id") String productId) {}
+    @JsonProperty("product_id") String productId) {
+
+  @JsonProperty("thumbnailUrl")
+  public String getThumbnailUrl() {
+    return thumbnailUrl;
+  }
+}
 

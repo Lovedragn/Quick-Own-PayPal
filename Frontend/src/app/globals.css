@@ -9,23 +9,23 @@
 }
 
 :root {
-  --bg: #F2FBEF;
-  --bg-band: #E8F4E2;
-  --surface: #FBFEF9;
+  --bg: #FFFFFF;
+  --bg-band: #F9FAFB;
+  --surface: #F9FAFB;
   --surface-card: #FFFFFF;
-  --line: #D8E5D0;
-  --line-strong: #B8C9AF;
-  --ink: #17270C;
-  --ink-2: #4A5A3F;
-  --ink-3: #5F6E5A;
-  --primary: #002125;
-  --primary-hover: #00373D;
+  --line: #E5E7EB;
+  --line-strong: #D1D5DB;
+  --ink: #0F172A;
+  --ink-2: #475569;
+  --ink-3: #64748B;
+  --primary: #0F172A;
+  --primary-hover: #1E293B;
   --paypal: #0070BA;
   --paypal-hover: #005ea6;
   --accent: #6FA956;
   --accent-display: #245A19;
   --accent-text: #245A19;
-  --accent-light: #EBF7E7;
+  --accent-light: #F0FDF4;
   --cal: var(--font-calsans), 'Cal Sans', sans-serif;
   --serif: 'Cormorant Garamond', 'Newsreader', 'PT Serif', Georgia, serif;
   --display-serif: 'Cormorant Garamond', 'Newsreader', Georgia, 'Times New Roman', serif;
@@ -401,14 +401,7 @@ h1, h2, h3, h4 {
 }
 
 /* Painterly watercolor splashes */
-.splash {
-  position: absolute;
-  pointer-events: none;
-  filter: blur(12px);
-  opacity: 0.6;
-  border-radius: 50%;
-  z-index: 0;
-}
+.splash { display: none; }
 
 .splash-l {
   width: 440px;
