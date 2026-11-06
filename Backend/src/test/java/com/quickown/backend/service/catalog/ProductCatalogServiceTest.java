@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.quickown.backend.catalog.MockProductCatalog;
 import com.quickown.backend.dto.product.ProductOffer;
 import com.quickown.backend.dto.product.ProductResult;
 import com.quickown.backend.exception.CatalogProviderException;
@@ -22,7 +21,6 @@ class ProductCatalogServiceTest {
     var service =
         new ProductCatalogService(
             new FakeChannel3(false, List.of()),
-            new MockProductCatalog(),
             new FakeFlipkart(true, List.of(product(
                 "Flipkart Affiliate API", "FLIPKART:SKU-1", "Sony WH-CH720N", "Sony",
                 new ProductOffer("Flipkart", new BigDecimal("8990"), "INR", "InStock",
@@ -50,7 +48,6 @@ class ProductCatalogServiceTest {
                 "Channel3", "C3-1", "Wireless headphones", "Sony",
                 new ProductOffer("bestbuy.com", new BigDecimal("99.99"), "USD", "InStock",
                     "https://bestbuy.com/item")))),
-            new MockProductCatalog(),
             new FakeFlipkart(false, List.of()),
             new FakeAmazon(false, List.of()),
             "INR");
@@ -66,7 +63,6 @@ class ProductCatalogServiceTest {
                 "Channel3", "C3-USD-1", "Wireless headphones", "Sony",
                 new ProductOffer("store.example", new BigDecimal("79.99"), "USD", "InStock",
                     "https://store.example/headphones")))),
-            new MockProductCatalog(),
             new FakeFlipkart(false, List.of()),
             new FakeAmazon(false, List.of()),
             "INR");
@@ -82,7 +78,6 @@ class ProductCatalogServiceTest {
     var service =
         new ProductCatalogService(
             new FakeChannel3(true, List.of(), true),
-            new MockProductCatalog(),
             new FakeFlipkart(true, List.of(product(
                 "Flipkart Affiliate API", "FLIPKART:SKU-2", "Samsung Galaxy Buds", "Samsung",
                 new ProductOffer("Flipkart", new BigDecimal("4999"), "INR", "InStock",
@@ -101,7 +96,6 @@ class ProductCatalogServiceTest {
     var service =
         new ProductCatalogService(
             new FakeChannel3(true, List.of(), true),
-            new MockProductCatalog(),
             new FakeFlipkart(true, List.of(), true),
             new FakeAmazon(false, List.of()),
             "INR");
@@ -112,19 +106,17 @@ class ProductCatalogServiceTest {
   }
 
   @Test
-  void usesLocalMockOnlyWhenNoLiveProviderCredentialsAreConfigured() {
+  void failsWhenNoLiveProviderCredentialsAreConfigured() {
     var service =
         new ProductCatalogService(
             new FakeChannel3(false, List.of()),
-            new MockProductCatalog(),
             new FakeFlipkart(false, List.of()),
             new FakeAmazon(false, List.of()),
             "INR");
 
-    var results = service.search("wireless headphones", true);
-
-    assertEquals(1, results.size());
-    assertEquals("Local mock catalogue", results.get(0).source());
+    assertThrows(
+        CatalogProviderException.class,
+        () -> service.search("wireless headphones", true));
   }
 
   private ProductResult product(

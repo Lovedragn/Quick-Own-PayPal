@@ -11,7 +11,10 @@ export async function GET(request) {
   }
 
   try {
-    const query = searchParams.get('q') || 'running shoes';
+    const query = (searchParams.get('q') || '').trim();
+    if (!query) {
+      return NextResponse.json({ success: true, products: [] });
+    }
     const limit = parseInt(searchParams.get('limit') || '5', 10);
 
     const page = await channel3.products.search({

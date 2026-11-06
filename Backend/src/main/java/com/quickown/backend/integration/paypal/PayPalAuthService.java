@@ -31,10 +31,12 @@ public class PayPalAuthService {
       @Value("${paypal.client-id:}") String clientId,
       @Value("${paypal.client-secret:}") String clientSecret,
       @Value("${paypal.base-url:https://api-m.sandbox.paypal.com}") String baseUrl) {
-    this.clientId = clientId == null ? "" : clientId.trim();
-    this.clientSecret = clientSecret == null ? "" : clientSecret.trim();
+    this.clientId = clientId == null ? "" : clientId.replaceAll("^[;\\s]+|[;\\s]+$", "");
+    this.clientSecret = clientSecret == null ? "" : clientSecret.replaceAll("^[;\\s]+|[;\\s]+$", "");
     this.baseUrl =
-        baseUrl == null ? "https://api-m.sandbox.paypal.com" : baseUrl.replaceAll("/+$", "");
+        baseUrl == null || baseUrl.isBlank()
+            ? "https://api-m.sandbox.paypal.com"
+            : baseUrl.replaceAll("[;/\\s]+$", "");
     this.httpClient =
         HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)

@@ -3,18 +3,13 @@ package com.quickown.backend.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.quickown.backend.catalog.MockProductCatalog;
-import com.quickown.backend.integration.channel3.Channel3CatalogClient;
-import com.quickown.backend.service.catalog.ProductCatalogService;
+import com.quickown.backend.testutil.TestProductCatalogService;
 import org.junit.jupiter.api.Test;
 
 class ProductControllerTest {
 
   private final ProductController controller =
-      new ProductController(
-          new ProductCatalogService(
-              new Channel3CatalogClient("", "https://api.trychannel3.com"),
-              new MockProductCatalog()));
+      new ProductController(new TestProductCatalogService());
 
   @Test
   void returnsStructuredProductCardsForFrontend() {

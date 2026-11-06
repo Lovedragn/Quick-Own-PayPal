@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  getStoredOrders,
+  saveStoredOrders,
+  getStoredPendingCheckout,
+  saveStoredPendingCheckout,
+  saveStoredCart,
+} from "@/lib/storage";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
@@ -31,6 +39,38 @@ export default function CheckoutSuccessPage() {
       }
       setResult(data);
       setStatus("success");
+
+      // Save to Ordered Products in local storage
+      const pending = getStoredPendingCheckout();
+      const existingOrders = getStoredOrders();
+      const isAlreadyRecorded = existingOrders.some((o) => o.orderId === data.orderId || o.captureId === data.captureId);
+
+      if (!isAlreadyRecorded) {
+        const newOrder = {
+          orderId: data.orderId || id,
+          captureId: data.captureId || "",
+          status: data.status || "COMPLETED",
+          currency: data.currency || (pending ? pending.currency : "USD"),
+          total: data.total || (pending ? pending.total : "0.00"),
+          date: new Date().toISOString(),
+          items: pending?.items || [
+            {
+              name: `Order ${data.orderId || id}`,
+              quantity: 1,
+              price: data.total,
+              currency: data.currency || "USD",
+            },
+          ],
+        };
+        saveStoredOrders([newOrder, ...existingOrders]);
+      }
+
+      // If checkout originated from Cart, empty cart
+      if (pending?.source === "cart") {
+        saveStoredCart([]);
+      }
+      saveStoredPendingCheckout(null);
+
     } catch (error) {
       setMessage(error.message || "We could not confirm the PayPal capture.");
       setStatus("error");
@@ -49,7 +89,18 @@ export default function CheckoutSuccessPage() {
   return (
     <main className="return-shell">
       <section className="return-card">
-        <Link className="brand" href="/"><span className="brand-mark">q</span><span>quick<span className="brand-accent">own</span></span></Link>
+        <Link className="brand" href="/">
+          <span className="brand-mark p-1.5">
+            <Image
+              src="/icon.svg"
+              alt="QuickOwn"
+              width={20}
+              height={20}
+              className="w-full h-full object-contain"
+            />
+          </span>
+          <span>quick<span className="brand-accent">own</span></span>
+        </Link>
         <div className="return-icon">{status === "success" ? "✓" : status === "error" ? "!" : "↻"}</div>
         {status === "loading" && <>
           <h1>Confirming your payment</h1>

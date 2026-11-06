@@ -1,6 +1,5 @@
 package com.quickown.backend.service.catalog;
 
-import com.quickown.backend.catalog.MockProductCatalog;
 import com.quickown.backend.dto.product.ProductOffer;
 import com.quickown.backend.dto.product.ProductResult;
 import com.quickown.backend.exception.CatalogProviderException;
@@ -34,20 +33,17 @@ public class ProductCatalogService {
   private final Channel3CatalogClient channel3Client;
   private final FlipkartAffiliateClient flipkartClient;
   private final AmazonCreatorsClient amazonClient;
-  private final MockProductCatalog mockCatalog;
   private final String marketCurrency;
 
   @Autowired
   public ProductCatalogService(
       Channel3CatalogClient channel3Client,
-      MockProductCatalog mockCatalog,
       FlipkartAffiliateClient flipkartClient,
       AmazonCreatorsClient amazonClient,
       @Value("${catalog.currency:INR}") String marketCurrency) {
     this.channel3Client = channel3Client;
     this.flipkartClient = flipkartClient;
     this.amazonClient = amazonClient;
-    this.mockCatalog = mockCatalog;
     this.marketCurrency =
         marketCurrency == null || marketCurrency.isBlank()
             ? "INR"
@@ -55,9 +51,8 @@ public class ProductCatalogService {
   }
 
   /** Backwards-compatible constructor used by existing unit tests. */
-  public ProductCatalogService(
-      Channel3CatalogClient channel3Client, MockProductCatalog mockCatalog) {
-    this(channel3Client, mockCatalog, null, null, "ANY");
+  public ProductCatalogService(Channel3CatalogClient channel3Client) {
+    this(channel3Client, null, null, "ANY");
   }
 
   public String getMarketCurrency() {
@@ -70,6 +65,22 @@ public class ProductCatalogService {
     result.put("Flipkart", flipkartClient != null && flipkartClient.isConfigured());
     result.put("Amazon.in", amazonClient != null && amazonClient.isConfigured());
     return Map.copyOf(result);
+  }
+
+  public ProductResult findById(String productId) {
+    if (productId == null || productId.isBlank()) {
+      return null;
+    }
+    if (channel3Client != null && channel3Client.isConfigured()) {
+      try {
+        ProductResult result = channel3Client.getProduct(productId);
+        if (result != null) {
+          return result;
+        }
+      } catch (Exception ignored) {
+      }
+    }
+    return null;
   }
 
   public List<ProductResult> search(String query, boolean inStockOnly) {
@@ -93,9 +104,8 @@ public class ProductCatalogService {
             || (amazonClient != null && amazonClient.isConfigured());
 
     if (!anyLiveProviderConfigured) {
-      List<ProductResult> mockResults =
-          mockCatalog.search(query, inStockOnly).stream().map(this::mapMockProduct).toList();
-      return mergeComparableProducts(mockResults, inStockOnly, searchCurrency);
+      throw new CatalogProviderException(
+          "No live product catalogue provider is configured. Please configure Channel3 API credentials.");
     }
 
     List<ProductResult> providerResults = new ArrayList<>();
@@ -108,7 +118,7 @@ public class ProductCatalogService {
       if (addProviderResults(
           providerResults,
           "Channel3",
-          () -> channel3Client.search(query, inStockOnly),
+          () -> channel3Client.search(query, inStockOnly, searchCurrency),
           failedProviders)) {
         successfulCount++;
       }
@@ -192,7 +202,7 @@ public class ProductCatalogService {
               product.description(),
               product.imageUrl(),
               eligibleOffers.stream().anyMatch(offer -> isInStock(offer.availability())),
-              List.copyOf(eligibleOffers));
+              List.copyOf(eligibleOffers), product.variants(), product.images());
 
       String key = comparisonKey(normalized);
       ProductResult previous = merged.get(key);
@@ -234,7 +244,8 @@ public class ProductCatalogService {
         first.description() == null ? second.description() : first.description(),
         first.imageUrl() == null ? second.imageUrl() : first.imageUrl(),
         offers.stream().anyMatch(offer -> isInStock(offer.availability())),
-        List.copyOf(offers));
+        List.copyOf(offers),
+        first.variants() != null ? first.variants() : second.variants(), first.images() != null && !first.images().isEmpty() ? first.images() : second.images());
   }
 
   private String comparisonKey(ProductResult product) {
@@ -284,26 +295,6 @@ public class ProductCatalogService {
         || normalized.equals("limitedavailability");
   }
 
-  private ProductResult mapMockProduct(MockProductCatalog.Product product) {
-    ProductOffer offer =
-        new ProductOffer(
-            "Mock catalogue",
-            BigDecimal.valueOf(product.price()),
-            "INR",
-            product.inStock() ? "InStock" : "OutOfStock",
-            null);
-
-    return new ProductResult(
-        "Local mock catalogue",
-        String.valueOf(product.id()),
-        product.name(),
-        product.brand(),
-        product.category(),
-        product.description(),
-        null,
-        product.inStock(),
-        List.of(offer));
-  }
 
   @FunctionalInterface
   private interface ProviderSearch {

@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quickown.backend.dto.product.ProductOffer;
 import com.quickown.backend.dto.product.ProductResult;
+import com.quickown.backend.dto.product.ProductVariants;
+import com.quickown.backend.dto.product.SelectedOption;
+import com.quickown.backend.dto.product.VariantOption;
+import com.quickown.backend.dto.product.VariantOptionValue;
 import com.quickown.backend.exception.Channel3ApiException;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -48,6 +52,10 @@ public class Channel3CatalogClient {
   }
 
   public List<ProductResult> search(String query, boolean inStockOnly) {
+    return search(query, inStockOnly, null);
+  }
+
+  public List<ProductResult> search(String query, boolean inStockOnly, String currency) {
     if (!isConfigured()) {
       throw new IllegalStateException("Channel3 API key is not configured.");
     }
@@ -56,7 +64,8 @@ public class Channel3CatalogClient {
     }
 
     try {
-      String requestBody = objectMapper.writeValueAsString(new SearchRequest(query.trim(), 10));
+      SearchConfig config = new SearchConfig("agentic", currency != null && !currency.isBlank() && !"ANY".equalsIgnoreCase(currency) ? currency.trim().toUpperCase(Locale.ROOT) : null);
+      String requestBody = objectMapper.writeValueAsString(new SearchRequest(query.trim(), 10, config));
 
       HttpRequest request =
           HttpRequest.newBuilder()
@@ -100,6 +109,37 @@ public class Channel3CatalogClient {
     }
   }
 
+  public ProductResult getProduct(String productId) {
+    if (!isConfigured() || productId == null || productId.isBlank()) {
+      return null;
+    }
+
+    try {
+      HttpRequest request =
+          HttpRequest.newBuilder()
+              .uri(URI.create(baseUrl + "/v1/products/" + productId.trim()))
+              .timeout(Duration.ofSeconds(15))
+              .header("x-api-key", apiKey)
+              .GET()
+              .build();
+
+      HttpResponse<String> response =
+          httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+      if (response.statusCode() < 200 || response.statusCode() >= 300) {
+        return null;
+      }
+
+      JsonNode root = objectMapper.readTree(response.body());
+      return toProductResult(root, false);
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      return null;
+    } catch (Exception exception) {
+      return null;
+    }
+  }
+
   private ProductResult toProductResult(JsonNode product, boolean inStockOnly) {
     String id = text(product, "id");
     String title = firstNonBlank(text(product, "title"), text(product, "name"));
@@ -135,6 +175,8 @@ public class Channel3CatalogClient {
     }
 
     boolean inStock = offers.stream().anyMatch(offer -> isInStock(offer.availability()));
+    ProductVariants variants = parseVariants(product.path("variants"));
+    List<String> images = allImageUrls(product.path("images"));
     return new ProductResult(
         "Channel3",
         id,
@@ -144,7 +186,64 @@ public class Channel3CatalogClient {
         description,
         imageUrl,
         inStock,
-        List.copyOf(offers));
+        List.copyOf(offers),
+        variants,
+        images);
+  }
+
+  private ProductVariants parseVariants(JsonNode variantsNode) {
+    if (variantsNode == null
+        || variantsNode.isNull()
+        || variantsNode.isMissingNode()
+        || !variantsNode.isObject()) {
+      return null;
+    }
+
+    JsonNode optionsNode = variantsNode.path("options");
+    List<VariantOption> options = new ArrayList<>();
+    if (optionsNode.isArray()) {
+      for (JsonNode optNode : optionsNode) {
+        String name = text(optNode, "name");
+        if (name == null || name.isBlank()) {
+          continue;
+        }
+        List<VariantOptionValue> values = new ArrayList<>();
+        JsonNode valuesNode = optNode.path("values");
+        if (valuesNode.isArray()) {
+          for (JsonNode valNode : valuesNode) {
+            String label = text(valNode, "label");
+            if (label == null || label.isBlank()) {
+              continue;
+            }
+            Boolean exists = valNode.has("exists") ? valNode.path("exists").asBoolean() : null;
+            String available = text(valNode, "available");
+            String thumbnailUrl =
+                firstNonBlank(text(valNode, "thumbnail_url"), text(valNode, "thumbnailUrl"));
+            String productId =
+                firstNonBlank(text(valNode, "product_id"), text(valNode, "productId"));
+            values.add(new VariantOptionValue(label, exists, available, thumbnailUrl, productId));
+          }
+        }
+        options.add(new VariantOption(name, List.copyOf(values)));
+      }
+    }
+
+    JsonNode selectedNode = variantsNode.path("selected");
+    List<SelectedOption> selected = new ArrayList<>();
+    if (selectedNode.isArray()) {
+      for (JsonNode selNode : selectedNode) {
+        String name = text(selNode, "name");
+        String label = text(selNode, "label");
+        if (name != null && label != null) {
+          selected.add(new SelectedOption(name, label));
+        }
+      }
+    }
+
+    if (options.isEmpty()) {
+      return null;
+    }
+    return new ProductVariants(List.copyOf(options), List.copyOf(selected));
   }
 
   private ProductOffer toOfferResult(JsonNode offer) {
@@ -219,12 +318,34 @@ public class Channel3CatalogClient {
       return null;
     }
     for (JsonNode image : images) {
+      String cleanedUrl = text(image, "cleaned_url");
+      if (cleanedUrl != null && !cleanedUrl.isBlank()) {
+        return cleanedUrl;
+      }
+    }
+    for (JsonNode image : images) {
       String url = text(image, "url");
-      if (url != null) {
+      if (url != null && !url.isBlank()) {
         return url;
       }
     }
     return null;
+  }
+
+  private List<String> allImageUrls(JsonNode images) {
+    if (!images.isArray()) {
+      return List.of();
+    }
+    List<String> list = new ArrayList<>();
+    for (JsonNode image : images) {
+      String cleanedUrl = text(image, "cleaned_url");
+      String url = text(image, "url");
+      String selected = (cleanedUrl != null && !cleanedUrl.isBlank()) ? cleanedUrl : url;
+      if (selected != null && !selected.isBlank() && !list.contains(selected)) {
+        list.add(selected);
+      }
+    }
+    return List.copyOf(list);
   }
 
   private String text(JsonNode node, String field) {
@@ -253,5 +374,7 @@ public class Channel3CatalogClient {
         || normalized.equals("limitedavailability");
   }
 
-  private record SearchRequest(String query, int limit) {}
+  private record SearchConfig(String mode, String currency) {}
+
+  private record SearchRequest(String query, int limit, SearchConfig config) {}
 }
