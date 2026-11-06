@@ -23,6 +23,7 @@ import {
   saveStoredPagination,
   saveStoredPendingCheckout,
 } from "@/lib/storage";
+import { extractNormalizedOffers } from "@/lib/variants";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -46,25 +47,7 @@ async function readApiResponse(response) {
 }
 
 function getOffers(recommendation) {
-  const offers = Array.isArray(recommendation.product?.offers)
-    ? [...recommendation.product.offers]
-    : [];
-  const chosen = recommendation.selectedOffer;
-  if (
-    chosen &&
-    !offers.some((offer) => offer.productUrl === chosen.productUrl)
-  ) {
-    offers.unshift(chosen);
-  }
-  return offers.filter(
-    (offer) =>
-      offer &&
-      offer.merchant &&
-      offer.price !== null &&
-      offer.price !== undefined &&
-      offer.currency &&
-      offer.productUrl,
-  );
+  return extractNormalizedOffers(recommendation);
 }
 
 export default function Home() {

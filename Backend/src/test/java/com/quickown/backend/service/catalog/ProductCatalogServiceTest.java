@@ -149,6 +149,11 @@ class ProductCatalogServiceTest {
 
     @Override
     public List<ProductResult> search(String query, boolean inStockOnly) {
+      return search(query, inStockOnly, null);
+    }
+
+    @Override
+    public List<ProductResult> search(String query, boolean inStockOnly, String currency) {
       if (fail) {
         throw new IllegalStateException("Channel3 unavailable");
       }

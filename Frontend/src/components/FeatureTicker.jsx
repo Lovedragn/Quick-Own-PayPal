@@ -18,7 +18,7 @@ export default function FeatureTicker() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[#16A34A]">✦</span>
-          <span>Sub-50ms Hybrid Elasticsearch Retrieval</span>
+          <span>Sub-50ms Multi-Merchant Catalog Retrieval</span>
         </div>
       </div>
     </div>

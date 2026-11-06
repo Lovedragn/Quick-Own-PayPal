@@ -14,18 +14,6 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
-import {
-  Zap,
-  Clock,
-  DollarSign,
-  Layers,
-  Database,
-  ShieldCheck,
-  CheckCircle2,
-  TrendingDown,
-  Sparkles,
-  Search,
-} from "lucide-react";
 
 // Shopping Evolution: Quick-Own Shopping vs Manual Shopping benchmark
 const SHOPPING_EVOLUTION_DATA = [
@@ -51,7 +39,7 @@ const SHOPPING_EVOLUTION_DATA = [
     manualTime: "2.0m",
   },
   {
-    stage: "Quick-Own Agent",
+    stage: "Future",
     quickOwn: 32,
     manual: 4,
     quickOwnTime: "1.2s",
@@ -59,51 +47,19 @@ const SHOPPING_EVOLUTION_DATA = [
   },
 ];
 
+const QUICK_OWN_COLOR = "#0091FF"; // Bright electric blue
+const MANUAL_COLOR = "#FF4D4D"; // Bright vivid coral red
+
 const evolutionChartConfig = {
   quickOwn: {
     label: "Quick-Own Shopping",
-    color: "#0070BA",
+    color: QUICK_OWN_COLOR,
   },
   manual: {
     label: "Manual Shopping",
-    color: "#EF4444",
+    color: MANUAL_COLOR,
   },
 };
-
-const PRODUCT_CARDS = [
-  {
-    tag: "Gemini 2.5 Flash",
-    title: "Intent Parsing",
-    subtitle: "Zero filters needed",
-    description:
-      "Gemini extracts category, budget, and specs straight from plain English.",
-    highlights: ["Natural query to JSON", "Strict budget limits"],
-  },
-  {
-    tag: "Channel3 Graph",
-    title: "Retail Graph",
-    subtitle: "100M+ live products",
-    description:
-      "Crawls and deduplicates offers across verified stores with real-time stock.",
-    highlights: ["Cross-merchant deals", "Real-time sync"],
-  },
-  {
-    tag: "Sub-50ms Index",
-    title: "Hybrid Search",
-    subtitle: "Dense vector + BM25",
-    description:
-      "Elasticsearch pairs embeddings and keywords for sub-50ms instant ranking.",
-    highlights: ["Instant retrieval", "High-accuracy matches"],
-  },
-  {
-    tag: "PayPal Sandbox",
-    title: "PayPal Orders v2",
-    subtitle: "Tamper-proof checkout",
-    description:
-      "Server-side price verification and safe 1-click PayPal approval links.",
-    highlights: ["Idempotent payments", "Zero fund risk"],
-  },
-];
 
 export default function ProductShowcaseSection() {
   const [activeMetricTab, setActiveMetricTab] = useState("savings"); // "savings" | "speed"
@@ -195,7 +151,7 @@ export default function ProductShowcaseSection() {
               <span className="text-sm font-mono text-zinc-500 uppercase tracking-wider block">
                 Checkout Security
               </span>
-              <span className="font-cal font-bold text-2xl sm:text-5xl text-[#0070BA] block mt-1">
+              <span className="font-cal font-bold text-2xl sm:text-5xl text-[#4c00ff] block mt-1">
                 100%
               </span>
               <span className="text-sm text-zinc-600 block mt-0.5">
@@ -244,7 +200,9 @@ export default function ProductShowcaseSection() {
                           const isQuickOwn =
                             name === "quickOwn" ||
                             name === "Quick-Own Shopping";
-                          const color = isQuickOwn ? "#0070BA" : "#EF4444";
+                          const color = isQuickOwn
+                            ? QUICK_OWN_COLOR
+                            : MANUAL_COLOR;
                           const label = isQuickOwn
                             ? "Quick-Own Shopping"
                             : "Manual Shopping";
@@ -282,40 +240,26 @@ export default function ProductShowcaseSection() {
                       />
                     }
                   />
-                  {/* Quick-Own Shopping - Blue Line */}
+                  {/* Quick-Own Shopping - Bright Blue Line */}
                   <Line
                     type="monotone"
                     dataKey="quickOwn"
-                    stroke="#0070BA"
-                    strokeWidth={3.5}
-                    dot={{
-                      r: 5,
-                      fill: "#0070BA",
-                      strokeWidth: 2,
-                      stroke: "#FFFFFF",
-                    }}
-                    activeDot={{ r: 7, fill: "#0070BA" }}
+                    stroke={QUICK_OWN_COLOR}
+                    strokeWidth={9}
                     name="Quick-Own Shopping"
                     isAnimationActive={true}
-                    animationDuration={2000}
-                    animationEasing="ease-in-out"
+                    animationDuration={3000}
+                    animationEasing="ease-out"
                   />
-                  {/* Manual Shopping - Red Curved Line */}
+                  {/* Manual Shopping - Bright Red Line */}
                   <Line
                     type="monotone"
                     dataKey="manual"
-                    stroke="#EF4444"
-                    strokeWidth={3.5}
-                    dot={{
-                      r: 5,
-                      fill: "#EF4444",
-                      strokeWidth: 2,
-                      stroke: "#FFFFFF",
-                    }}
-                    activeDot={{ r: 7, fill: "#EF4444" }}
+                    stroke={MANUAL_COLOR}
+                    strokeWidth={9}
                     name="Manual Shopping"
                     isAnimationActive={true}
-                    animationDuration={2000}
+                    animationDuration={4000}
                     animationEasing="ease-in-out"
                   />
                 </LineChart>

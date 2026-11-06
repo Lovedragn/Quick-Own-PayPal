@@ -1,6 +1,7 @@
 "use client";
 
-import { Search, Sparkles, AlertCircle } from "lucide-react";
+import { Search, AlertCircle } from "lucide-react";
+import SpinningRing from "@/components/ui/spinning-ring";
 
 export default function HeroSearchSection({
   query,
@@ -17,7 +18,7 @@ export default function HeroSearchSection({
       <span className="splash splash-c" aria-hidden="true" />
 
       <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 flex flex-col justify-center items-center">
-        <div className="hero-inner w-full py-8">
+        <div className="hero-inner w-full py-8 text-center">
           <h1 className="font-cal font-bold text-4xl sm:text-6xl lg:text-[64px] leading-[1.08] tracking-tight text-[#17270C] mb-4">
             Search less. Save more. <br />
             <span className="text-[#245A19]">
@@ -48,7 +49,7 @@ export default function HeroSearchSection({
                 />
                 {searching && (
                   <div className="pr-3.5 flex items-center flex-shrink-0">
-                    <Sparkles className="w-4 h-4 animate-spin text-[#245A19]" />
+                    <SpinningRing size="sm" />
                   </div>
                 )}
               </div>
@@ -57,7 +58,7 @@ export default function HeroSearchSection({
 
           {/* Error Banner */}
           {error && (
-            <div className="max-w-2xl mx-auto w-full px-4 mt-4">
+            <div className="max-w-2xl mx-auto w-full px-4 mt-4 text-left">
               <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -77,8 +78,8 @@ export default function HeroSearchSection({
           {/* Searching State */}
           {searching && (
             <div className="py-16 text-center max-w-xl mx-auto px-4 w-full">
-              <div className="w-12 h-12 rounded-2xl bg-[#E8F4E2] text-[#3F7A2E] flex items-center justify-center mx-auto mb-4 animate-pulse">
-                <Sparkles className="w-6 h-6" />
+              <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4 border border-emerald-200/80 shadow-xs">
+                <SpinningRing size="lg" />
               </div>
               <h3 className="font-cal font-bold text-2xl text-[#17270C] mb-2">
                 Searching Verified Stores…

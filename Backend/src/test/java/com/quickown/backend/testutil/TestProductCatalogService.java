@@ -24,7 +24,8 @@ public class TestProductCatalogService extends ProductCatalogService {
               true,
               List.of(
                   new ProductOffer(
-                      "Mock catalogue", new BigDecimal("17999"), "INR", "InStock", null))),
+                      "Mock catalogue", new BigDecimal("17999"), "INR", "InStock", null)),
+              ProductResult.createDefaultVariants("1", "Galaxy M35 5G (Midnight Blue)", null, true)),
           new ProductResult(
               "Local mock catalogue",
               "2",
@@ -36,7 +37,8 @@ public class TestProductCatalogService extends ProductCatalogService {
               true,
               List.of(
                   new ProductOffer(
-                      "Mock catalogue", new BigDecimal("15999"), "INR", "InStock", null))),
+                      "Mock catalogue", new BigDecimal("15999"), "INR", "InStock", null)),
+              ProductResult.createDefaultVariants("2", "Galaxy A16 5G (Light Green)", null, true)),
           new ProductResult(
               "Local mock catalogue",
               "3",
@@ -48,7 +50,8 @@ public class TestProductCatalogService extends ProductCatalogService {
               true,
               List.of(
                   new ProductOffer(
-                      "Mock catalogue", new BigDecimal("19999"), "INR", "InStock", null))),
+                      "Mock catalogue", new BigDecimal("19999"), "INR", "InStock", null)),
+              ProductResult.createDefaultVariants("3", "Nord CE 4 Lite (Super Silver)", null, true)),
           new ProductResult(
               "Local mock catalogue",
               "4",
@@ -60,7 +63,8 @@ public class TestProductCatalogService extends ProductCatalogService {
               true,
               List.of(
                   new ProductOffer(
-                      "Mock catalogue", new BigDecimal("4999"), "INR", "InStock", null))),
+                      "Mock catalogue", new BigDecimal("4999.0"), "INR", "InStock", null)),
+              ProductResult.createDefaultVariants("4", "Wireless Headphones 450 (Black)", null, true)),
           new ProductResult(
               "Local mock catalogue",
               "5",
@@ -72,7 +76,8 @@ public class TestProductCatalogService extends ProductCatalogService {
               false,
               List.of(
                   new ProductOffer(
-                      "Mock catalogue", new BigDecimal("2499"), "INR", "OutOfStock", null))));
+                      "Mock catalogue", new BigDecimal("2499"), "INR", "OutOfStock", null)),
+              ProductResult.createDefaultVariants("5", "Redmi Buds 5 (White)", null, false)));
 
   public TestProductCatalogService() {
     super(new Channel3CatalogClient("test-key", "https://api.trychannel3.com"));
@@ -84,18 +89,28 @@ public class TestProductCatalogService extends ProductCatalogService {
       throw new IllegalArgumentException("query must contain 1-250 characters.");
     }
     String q = query.toLowerCase(Locale.ROOT);
+    boolean hasSamsung = q.contains("samsung");
+    boolean hasSmartphone = q.contains("smartphone");
+    boolean hasEarbud = q.contains("earbud");
+    boolean hasHeadphone = q.contains("headphone");
+
     return TEST_PRODUCTS.stream()
         .filter(p -> !inStockOnly || p.inStock())
         .filter(
-            p ->
-                p.name().toLowerCase(Locale.ROOT).contains(q)
-                    || p.brand().toLowerCase(Locale.ROOT).contains(q)
-                    || p.category().toLowerCase(Locale.ROOT).contains(q)
-                    || p.description().toLowerCase(Locale.ROOT).contains(q)
-                    || (q.contains("smartphone") && p.category().equalsIgnoreCase("Smartphone"))
-                    || (q.contains("earbud") && p.category().equalsIgnoreCase("Earbuds"))
-                    || (q.contains("headphone") && p.category().equalsIgnoreCase("Headphones"))
-                    || (q.contains("samsung") && p.brand().equalsIgnoreCase("Samsung")))
+            p -> {
+              if (hasSamsung && hasSmartphone) {
+                return p.brand().equalsIgnoreCase("Samsung")
+                    && p.category().equalsIgnoreCase("Smartphone");
+              }
+              return p.name().toLowerCase(Locale.ROOT).contains(q)
+                  || p.brand().toLowerCase(Locale.ROOT).contains(q)
+                  || p.category().toLowerCase(Locale.ROOT).contains(q)
+                  || p.description().toLowerCase(Locale.ROOT).contains(q)
+                  || (hasSmartphone && p.category().equalsIgnoreCase("Smartphone"))
+                  || (hasEarbud && p.category().equalsIgnoreCase("Earbuds"))
+                  || (hasHeadphone && p.category().equalsIgnoreCase("Headphones"))
+                  || (hasSamsung && p.brand().equalsIgnoreCase("Samsung"));
+            })
         .toList();
   }
 }

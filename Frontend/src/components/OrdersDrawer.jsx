@@ -124,9 +124,9 @@ export default function OrdersDrawer({
                         className="flex items-center gap-3 bg-white p-2.5 rounded-lg border border-slate-100"
                       >
                         <div className="relative w-12 h-12 shrink-0 bg-slate-50 rounded-md overflow-hidden border border-slate-200">
-                          {imageUrl ? (
+                          {imageUrl && typeof imageUrl === "string" && imageUrl.trim() ? (
                             <Image
-                              src={imageUrl}
+                              src={imageUrl.trim()}
                               alt={item.name || item.productName || "Ordered Product"}
                               fill
                               sizes="48px"
