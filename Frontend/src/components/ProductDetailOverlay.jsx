@@ -6,10 +6,16 @@ import {
   getColorHex,
   isValueOutOfStock,
   isValueMissing,
+  extractImageUrl,
+  buildCleanedUrlMap,
+  getPrimaryCleanedImage,
+  deduplicateImages,
+  extractNormalizedOffers,
 } from "@/lib/variants";
 import {
   fetchProductSampleImages,
   getCachedProductImages,
+  getCachedProduct,
 } from "@/lib/productDetailService";
 
 import Image from "next/image";
@@ -54,25 +60,7 @@ function cleanDescription(text) {
 }
 
 function getOffers(recommendation) {
-  const offers = Array.isArray(recommendation?.product?.offers)
-    ? [...recommendation.product.offers]
-    : [];
-  const chosen = recommendation?.selectedOffer;
-  if (
-    chosen &&
-    !offers.some((offer) => offer.productUrl === chosen.productUrl)
-  ) {
-    offers.unshift(chosen);
-  }
-  return offers.filter(
-    (offer) =>
-      offer &&
-      offer.merchant &&
-      offer.price !== null &&
-      offer.price !== undefined &&
-      offer.currency &&
-      offer.productUrl,
-  );
+  return extractNormalizedOffers(recommendation);
 }
 
 export default function ProductDetailOverlay({
@@ -102,28 +90,63 @@ export default function ProductDetailOverlay({
   const [justAddedToCart, setJustAddedToCart] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
   const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
+  const [fetchedProduct, setFetchedProduct] = useState(() => {
+    return getCachedProduct(product?.productId) || null;
+  });
   const [fetchedImages, setFetchedImages] = useState(() => {
-    const cached = getCachedProductImages(product?.productId);
-    if (cached && cached.length) return cached;
+    const cachedImages = getCachedProductImages(product?.productId);
+    if (cachedImages && cachedImages.length) return cachedImages;
+    const cachedProd = getCachedProduct(product?.productId);
+    if (cachedProd?.images && cachedProd.images.length) return cachedProd.images;
     return Array.isArray(product?.images) ? product.images : [];
   });
 
-  // Lazy-load sample images if not already present on product
+  // Always fetch full details and variants from Channel3 API on detail open
   useEffect(() => {
     if (!product?.productId) return;
-    const initialImages = Array.isArray(product.images) ? product.images : [];
-    if (initialImages.length > 1) return;
-    // Fetch from Channel3 API on detail open
     let isSubscribed = true;
     fetchProductSampleImages(product.productId).then((data) => {
-      if (isSubscribed && data?.images?.length) {
+      if (!isSubscribed || !data) return;
+      if (data.rawProduct) {
+        setFetchedProduct(data.rawProduct);
+      }
+      if (data.images?.length) {
         setFetchedImages(data.images);
       }
     });
     return () => {
       isSubscribed = false;
     };
-  }, [product?.productId, product?.images]);
+  }, [product?.productId]);
+
+  // Cleaned image map (raw URL/UUID -> cleaned_url)
+  const cleanedMap = useMemo(() => {
+    return buildCleanedUrlMap(product, fetchedProduct);
+  }, [product, fetchedProduct]);
+
+  const activeProduct = useMemo(() => {
+    if (!fetchedProduct) return product;
+    const rawImgs =
+      fetchedProduct.images && fetchedProduct.images.length > 0
+        ? fetchedProduct.images
+        : product?.images;
+    const normalizedImages = Array.isArray(rawImgs)
+      ? deduplicateImages(rawImgs, cleanedMap)
+      : [];
+
+    return {
+      ...product,
+      ...fetchedProduct,
+      imageUrl:
+        getPrimaryCleanedImage(product, fetchedProduct, cleanedMap) ||
+        extractImageUrl(fetchedProduct.imageUrl, cleanedMap) ||
+        extractImageUrl(product?.imageUrl, cleanedMap) ||
+        (normalizedImages.length > 0 ? normalizedImages[0] : null),
+      variants: fetchedProduct.variants || product?.variants,
+      images: normalizedImages,
+      key_features: fetchedProduct.key_features || product?.key_features,
+    };
+  }, [product, fetchedProduct, cleanedMap]);
 
   // Close on Escape key
   useEffect(() => {
@@ -145,10 +168,155 @@ export default function ProductDetailOverlay({
     };
   }, []);
 
-  const selectedOffer = offers[selectedOfferIdx] || offers[0];
+  // Variants calculation & normalization using activeProduct and cleanedMap
+  const variantData = useMemo(
+    () => normalizeProductVariants(activeProduct, cleanedMap),
+    [activeProduct, cleanedMap],
+  );
+  const [userSelectedOptions, setUserSelectedOptions] = useState(() => {
+    if (typeof initialVariantIndex === "string" && initialVariantIndex) {
+      return { Color: initialVariantIndex };
+    }
+    return {};
+  });
+
+  const colorOption = variantData.colorOption;
+  const colorValues = colorOption?.values || [];
+
+  const [prevVariant, setPrevVariant] = useState(initialVariantIndex);
+  if (prevVariant !== initialVariantIndex) {
+    setPrevVariant(initialVariantIndex);
+    if (
+      typeof initialVariantIndex === "string" &&
+      initialVariantIndex &&
+      colorOption
+    ) {
+      setUserSelectedOptions((prev) => ({
+        ...prev,
+        [colorOption.name]: initialVariantIndex,
+      }));
+    } else if (
+      typeof initialVariantIndex === "number" &&
+      initialVariantIndex > 0 &&
+      colorOption?.values?.[initialVariantIndex]?.label
+    ) {
+      setUserSelectedOptions((prev) => ({
+        ...prev,
+        [colorOption.name]: colorOption.values[initialVariantIndex].label,
+      }));
+    }
+  }
+
+  const selectedOptions = useMemo(
+    () => ({ ...(variantData?.selectedMap || {}), ...userSelectedOptions }),
+    [variantData, userSelectedOptions],
+  );
+
+  const activeColorLabel =
+    (colorOption && selectedOptions[colorOption.name]) ||
+    colorValues[0]?.label ||
+    "Standard Edition";
+
+  const activeColorValue =
+    colorValues.find(
+      (v) => (v.label || "").toLowerCase() === activeColorLabel.toLowerCase(),
+    ) ||
+    colorValues[0] ||
+    null;
+
+  const activeVariantProductId =
+    activeColorValue?.product_id ||
+    activeColorValue?.productId ||
+    (activeColorValue?.id && !String(activeColorValue.id).startsWith("var-")
+      ? activeColorValue.id
+      : null);
+
+  // Variant details map to store fetched data for each colorway variant
+  const [variantDetailsMap, setVariantDetailsMap] = useState({});
+
+  const cachedVariantProd =
+    activeVariantProductId && activeVariantProductId !== product?.productId
+      ? getCachedProduct(activeVariantProductId)
+      : null;
+  const cachedVariantImgs =
+    activeVariantProductId && activeVariantProductId !== product?.productId
+      ? getCachedProductImages(activeVariantProductId)
+      : null;
+
+  const activeVariantData = useMemo(() => {
+    if (!activeVariantProductId || activeVariantProductId === product?.productId) {
+      return null;
+    }
+    if (variantDetailsMap[activeVariantProductId]) {
+      return variantDetailsMap[activeVariantProductId];
+    }
+    if (cachedVariantProd) {
+      return {
+        rawProduct: cachedVariantProd,
+        images:
+          cachedVariantImgs ||
+          (Array.isArray(cachedVariantProd.images)
+            ? cachedVariantProd.images
+            : []),
+      };
+    }
+    return null;
+  }, [
+    activeVariantProductId,
+    product?.productId,
+    variantDetailsMap,
+    cachedVariantProd,
+    cachedVariantImgs,
+  ]);
+
+  // Whenever activeVariantProductId changes, fetch its full details & images!
+  useEffect(() => {
+    if (!activeVariantProductId || activeVariantProductId === product?.productId) return;
+    if (variantDetailsMap[activeVariantProductId]) return;
+
+    let isSubscribed = true;
+    fetchProductSampleImages(activeVariantProductId).then((data) => {
+      if (!isSubscribed || !data) return;
+      setVariantDetailsMap((prev) => ({
+        ...prev,
+        [activeVariantProductId]: data,
+      }));
+    });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [activeVariantProductId, product?.productId, variantDetailsMap]);
+
+  const variantCleanedMap = useMemo(() => {
+    return buildCleanedUrlMap(
+      product,
+      fetchedProduct,
+      activeVariantData?.rawProduct,
+    );
+  }, [product, fetchedProduct, activeVariantData]);
+
+  // Offers resolution: dynamically switch to selected variant offers when available
+  const activeOffers = useMemo(() => {
+    if (
+      activeVariantProductId &&
+      activeVariantProductId !== product?.productId &&
+      activeVariantData?.rawProduct?.offers?.length
+    ) {
+      const variantOffers = extractNormalizedOffers(
+        activeVariantData.rawProduct,
+      );
+      if (variantOffers.length > 0) {
+        return variantOffers;
+      }
+    }
+    return offers;
+  }, [activeVariantProductId, product?.productId, activeVariantData, offers]);
+
+  const selectedOffer = activeOffers[selectedOfferIdx] || activeOffers[0] || null;
 
   // Price calculations
-  const prices = offers.map((o) => Number(o.price)).filter(Number.isFinite);
+  const prices = activeOffers.map((o) => Number(o.price)).filter(Number.isFinite);
   const lowestPrice =
     prices.length > 0 ? Math.min(...prices) : Number(selectedOffer?.price || 0);
   const highestPrice =
@@ -165,35 +333,6 @@ export default function ProductDetailOverlay({
             100,
         )
       : null;
-
-  // Variants calculation & normalization
-  const variantData = useMemo(
-    () => normalizeProductVariants(product),
-    [product],
-  );
-  const [userSelectedOptions, setUserSelectedOptions] = useState({});
-  const selectedOptions = useMemo(
-    () => ({ ...(variantData?.selectedMap || {}), ...userSelectedOptions }),
-    [variantData, userSelectedOptions],
-  );
-
-  const colorOption = variantData.colorOption;
-  const colorValues = colorOption?.values || [];
-
-  const activeColorLabel =
-    (colorOption && selectedOptions[colorOption.name]) ||
-    colorOption?.values[selectedVariant]?.label ||
-    "Standard Edition";
-
-  const [hoveredVariantIdx, setHoveredVariantIdx] = useState(null);
-
-  const activeColorValue =
-    colorValues.find((v) => v.label === activeColorLabel) ||
-    colorValues[selectedVariant] ||
-    null;
-
-  const previewColorValue =
-    hoveredVariantIdx !== null ? colorValues[hoveredVariantIdx] : null;
 
   const channel3SizeOption = variantData.sizeOption;
   const activeSizeLabel = channel3SizeOption
@@ -213,44 +352,121 @@ export default function ProductDetailOverlay({
     return { sizes: [], sizeType: "" };
   }, [product, channel3SizeOption]);
 
-  // Collect all unique sample images from variant swatches, fetched images, product images, and fallback
-  const galleryImages = useMemo(() => {
-    const list = [
-      previewColorValue?.imageUrl,
-      previewColorValue?.thumbnailUrl,
-      activeColorValue?.imageUrl,
-      activeColorValue?.thumbnailUrl,
-      ...(Array.isArray(fetchedImages) ? fetchedImages : []),
-      ...(Array.isArray(product?.images) ? product.images : []),
-      product?.imageUrl,
-    ].filter(Boolean);
+  const primaryCleanedImage = useMemo(() => {
+    return (
+      getPrimaryCleanedImage(product, fetchedProduct, variantCleanedMap) ||
+      extractImageUrl(activeProduct?.imageUrl, variantCleanedMap) ||
+      null
+    );
+  }, [product, fetchedProduct, variantCleanedMap, activeProduct]);
 
-    // Deduplicate preserving order
-    return Array.from(new Set(list));
-  }, [previewColorValue, activeColorValue, fetchedImages, product]);
+  // Collect all unique sample images for the currently active colorway
+  const galleryImages = useMemo(() => {
+    const isSpecificVariant =
+      activeVariantProductId &&
+      activeVariantProductId !== product?.productId;
+
+    if (isSpecificVariant) {
+      // 1. If variant data has fetched images, use variant's own angle images
+      if (activeVariantData?.images && activeVariantData.images.length > 0) {
+        return deduplicateImages(activeVariantData.images, variantCleanedMap);
+      }
+      // 2. If variant rawProduct has images
+      if (
+        Array.isArray(activeVariantData?.rawProduct?.images) &&
+        activeVariantData.rawProduct.images.length > 0
+      ) {
+        return deduplicateImages(
+          activeVariantData.rawProduct.images,
+          variantCleanedMap,
+        );
+      }
+      // 3. Fallback to this variant's hero / thumbnail image ONLY (never show old color angles!)
+      const variantHero =
+        extractImageUrl(activeColorValue?.imageUrl, variantCleanedMap) ||
+        extractImageUrl(activeColorValue?.thumbnailUrl, variantCleanedMap) ||
+        null;
+      return variantHero ? [variantHero] : [];
+    }
+
+    // Base product gallery
+    const list = [
+      activeColorValue?.imageUrl || activeColorValue?.thumbnailUrl,
+      primaryCleanedImage,
+      ...(Array.isArray(fetchedImages) ? fetchedImages : []),
+      ...(Array.isArray(activeProduct?.images) ? activeProduct.images : []),
+      activeProduct?.imageUrl,
+    ];
+
+    return deduplicateImages(list, variantCleanedMap);
+  }, [
+    activeVariantProductId,
+    product?.productId,
+    activeVariantData,
+    activeColorValue,
+    primaryCleanedImage,
+    fetchedImages,
+    activeProduct,
+    variantCleanedMap,
+  ]);
+
+  const safeImageIndex =
+    activeImageIndex >= 0 && activeImageIndex < galleryImages.length
+      ? activeImageIndex
+      : 0;
 
   // Main featured image priority:
-  // 1. Swatch preview (if currently hovering color swatch)
-  // 2. Active gallery thumbnail selection
-  // 3. Active color value
-  // 4. Default product imageUrl
+  // 1. Active gallery thumbnail selection
+  // 2. Active color variant value
+  // 3. Primary cleaned product image
   const currentFeaturedImage = useMemo(() => {
-    if (previewColorValue?.imageUrl || previewColorValue?.thumbnailUrl) {
-      return previewColorValue.imageUrl || previewColorValue.thumbnailUrl;
+    if (
+      galleryImages.length > 0 &&
+      typeof galleryImages[safeImageIndex] === "string" &&
+      galleryImages[safeImageIndex].trim()
+    ) {
+      return galleryImages[safeImageIndex].trim();
     }
-    if (galleryImages.length > 0 && galleryImages[activeImageIndex]) {
-      return galleryImages[activeImageIndex];
-    }
-    return (
-      activeColorValue?.imageUrl ||
-      activeColorValue?.thumbnailUrl ||
-      product?.imageUrl ||
-      ""
-    );
-  }, [previewColorValue, galleryImages, activeImageIndex, activeColorValue, product]);
+
+    const active =
+      extractImageUrl(activeColorValue?.imageUrl, variantCleanedMap) ||
+      extractImageUrl(activeColorValue?.thumbnailUrl, variantCleanedMap) ||
+      primaryCleanedImage ||
+      null;
+
+    return active;
+  }, [galleryImages, safeImageIndex, activeColorValue, variantCleanedMap, primaryCleanedImage]);
+
+  const displayTitle =
+    activeVariantData?.rawProduct?.title ||
+    activeProduct?.name ||
+    product?.name;
+
+  const currentRecommendation = useMemo(() => {
+    const isSpecificVariant =
+      activeVariantProductId && activeVariantProductId !== product?.productId;
+    if (!isSpecificVariant) return recommendation;
+
+    return {
+      ...recommendation,
+      product: {
+        ...product,
+        ...(activeVariantData?.rawProduct || {}),
+        productId: activeVariantProductId,
+        name: displayTitle,
+      },
+      selectedOffer,
+    };
+  }, [
+    recommendation,
+    product,
+    activeVariantProductId,
+    activeVariantData,
+    displayTitle,
+    selectedOffer,
+  ]);
 
   const isSelectedVariantOutOfStock = useMemo(() => {
-    if (!variantData.hasVariants) return false;
     if (activeColorValue && isValueOutOfStock(activeColorValue)) {
       return true;
     }
@@ -263,13 +479,16 @@ export default function ProductDetailOverlay({
         return true;
       }
     }
+    if (!variantData.hasVariants && activeProduct?.inStock === false) {
+      return true;
+    }
     return false;
-  }, [variantData, activeColorValue, channel3SizeOption, selectedOptions]);
+  }, [variantData, activeColorValue, channel3SizeOption, selectedOptions, activeProduct]);
 
   if (!product) return null;
 
   // Additional details extraction
-  const rawDescription = cleanDescription(product.description);
+  const rawDescription = cleanDescription(activeProduct?.description || product.description);
   const isDescriptionLong = rawDescription
     ? rawDescription.length > 200
     : false;
@@ -367,15 +586,14 @@ export default function ProductDetailOverlay({
 
             {/* Thumbnail Gallery Strip */}
             {galleryImages.length > 1 && (
-              <div className="flex items-center gap-2 mt-4 w-full overflow-x-auto pb-1 scrollbar-none">
+              <div className="flex items-center gap-2 mt-4 w-full overflow-x-auto py-1 px-0.5 scrollbar-none">
                 {galleryImages.map((img, idx) => (
                   <button
-                    key={idx}
+                    key={`${activeVariantProductId || "base"}-${idx}-${img}`}
                     type="button"
-                    onMouseEnter={() => setActiveImageIndex(idx)}
                     onClick={() => setActiveImageIndex(idx)}
                     className={`relative w-16 h-16 flex-shrink-0 bg-[#F6F7F9] rounded-none border transition-all cursor-pointer p-1 overflow-hidden ${
-                      activeImageIndex === idx
+                      safeImageIndex === idx
                         ? "border-black ring-1 ring-black"
                         : "border-slate-200 hover:border-slate-400 opacity-80 hover:opacity-100"
                     }`}
@@ -427,7 +645,7 @@ export default function ProductDetailOverlay({
                 disabled={isSelectedVariantOutOfStock}
                 onClick={() => {
                   if (onAddToCart && selectedOffer) {
-                    onAddToCart(recommendation, selectedOffer, quantity);
+                    onAddToCart(currentRecommendation, selectedOffer, quantity);
                     setJustAddedToCart(true);
                     setTimeout(() => setJustAddedToCart(false), 1200);
                   }
@@ -451,7 +669,7 @@ export default function ProductDetailOverlay({
                 </p>
 
                 <h2 className="font-cal text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-snug">
-                  {product.name}
+                  {displayTitle}
                 </h2>
 
                 {/* Price Row */}
@@ -496,22 +714,32 @@ export default function ProductDetailOverlay({
                       )}
                   </div>
 
-                  {/* Circular Variant Swatches */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
+                  {/* Variant Swatches */}
+                  <div className="flex items-center gap-2 overflow-x-auto py-1.5 px-0.5 scrollbar-none">
                     {colorValues.map((v, idx) => {
                       const isSelected =
-                        activeColorLabel === v.label || selectedVariant === idx;
+                        Boolean(activeColorValue) &&
+                        ((v.id &&
+                          activeColorValue.id &&
+                          v.id === activeColorValue.id) ||
+                          (v.label &&
+                            activeColorValue.label &&
+                            v.label.toLowerCase() ===
+                              activeColorValue.label.toLowerCase()));
                       const isOutOfStock = isValueOutOfStock(v);
                       const isMissing = isValueMissing(v);
+                      const swatchThumb =
+                        (typeof v.thumbnailUrl === "string" && v.thumbnailUrl.trim()) ||
+                        (typeof v.imageUrl === "string" && v.imageUrl.trim()) ||
+                        null;
                       return (
                         <button
                           key={v.id || v.label || idx}
                           type="button"
-                          onMouseEnter={() => setHoveredVariantIdx(idx)}
-                          onMouseLeave={() => setHoveredVariantIdx(null)}
                           onClick={() => {
                             setSelectedVariant(idx);
-                            setHoveredVariantIdx(null);
+                            setActiveImageIndex(0);
+                            setSelectedOfferIdx(0);
                             if (colorOption) {
                               setUserSelectedOptions((prev) => ({
                                 ...prev,
@@ -519,25 +747,25 @@ export default function ProductDetailOverlay({
                               }));
                             }
                           }}
-                          className={`relative w-9 h-9 rounded-full overflow-hidden border bg-[#F6F7F9] transition-all cursor-pointer flex-shrink-0 flex items-center justify-center ${
+                          className={`relative w-11 h-11 rounded-none overflow-hidden border bg-[#F6F7F9] transition-all cursor-pointer flex-shrink-0 flex items-center justify-center ${
                             isSelected
-                              ? "ring-1.5 ring-offset-1 ring-black border-black scale-105 shadow-xs"
-                              : "border-slate-300 hover:border-slate-400 opacity-80 hover:opacity-100"
+                              ? "border-black ring-1 ring-black shadow-xs"
+                              : "border-slate-200 hover:border-slate-400 opacity-80 hover:opacity-100"
                           } ${isOutOfStock ? "opacity-60" : ""} ${isMissing ? "opacity-30 border-dashed" : ""}`}
                           title={`${v.label}${isOutOfStock ? " (Out of Stock)" : ""}`}
                           aria-label={`${v.label}${isOutOfStock ? " (Out of Stock)" : ""}`}
                         >
-                          {v.thumbnailUrl || v.imageUrl ? (
+                          {swatchThumb ? (
                             <Image
-                              src={v.thumbnailUrl || v.imageUrl}
+                              src={swatchThumb}
                               alt={v.label || "Variant"}
                               fill
                               unoptimized
-                              className="object-contain p-[1px] rounded-full"
+                              className="object-contain p-0.5 rounded-none"
                             />
                           ) : (
                             <span
-                              className="w-full h-full rounded-full"
+                              className="w-full h-full rounded-none"
                               style={{ backgroundColor: getColorHex(v.label) }}
                             />
                           )}
@@ -684,6 +912,16 @@ export default function ProductDetailOverlay({
                     >
                       {rawDescription}
                     </p>
+                    {Array.isArray(activeProduct?.key_features) &&
+                      activeProduct.key_features.length > 0 && (
+                        <ul className="mt-2.5 space-y-1 list-disc list-inside text-xs text-slate-700">
+                          {activeProduct.key_features.map((feat, idx) => (
+                            <li key={idx} className="leading-snug">
+                              {feat}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     {isDescriptionLong && (
                       <button
                         type="button"
@@ -742,23 +980,21 @@ export default function ProductDetailOverlay({
                       {product.inStock !== false ? "In Stock" : "Limited stock"}
                     </span>
                   </div>
-                  {product.productId && (
-                    <div className="grid grid-cols-2 p-2">
-                      <span className="text-slate-500 font-cal">
-                        Product ID / SKU
-                      </span>
-                      <span className="text-slate-700 font-mono text-[11px] truncate">
-                        {product.productId}
-                      </span>
-                    </div>
-                  )}
-                  {offers.length > 0 && (
+                  <div className="grid grid-cols-2 p-2">
+                    <span className="text-slate-500 font-cal">
+                      Product ID / SKU
+                    </span>
+                    <span className="text-slate-700 font-mono text-[11px] truncate">
+                      {activeVariantProductId || product.productId}
+                    </span>
+                  </div>
+                  {activeOffers.length > 0 && (
                     <div className="grid grid-cols-2 p-2 bg-[#FAFAFA]">
                       <span className="text-slate-500 font-cal">
                         Retailer Stores
                       </span>
                       <span className="text-slate-900 font-medium font-sans">
-                        {offers.length} stores compared
+                        {activeOffers.length} stores compared
                       </span>
                     </div>
                   )}
@@ -769,7 +1005,7 @@ export default function ProductDetailOverlay({
               <div className="pt-3 border-t border-slate-100">
                 <div className="flex items-center justify-between text-[14px] mb-2">
                   <span className="font-cal font-semibold text-slate-800">
-                    Available at ({offers.length} stores)
+                    Available at ({activeOffers.length} stores)
                   </span>
                   <span className="text-[11px] font-cal text-slate-400">
                     Select store to buy from
@@ -777,10 +1013,10 @@ export default function ProductDetailOverlay({
                 </div>
 
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
-                  {offers.map((offer, idx) => {
+                  {activeOffers.map((offer, idx) => {
                     const isSelected = idx === selectedOfferIdx;
                     const isBestPrice =
-                      Number(offer.price) === lowestPrice && offers.length > 1;
+                      Number(offer.price) === lowestPrice && activeOffers.length > 1;
 
                     return (
                       <div
@@ -788,7 +1024,7 @@ export default function ProductDetailOverlay({
                         onClick={() => {
                           setSelectedOfferIdx(idx);
                           if (onSelectOffer) {
-                            onSelectOffer(product.productId, idx);
+                            onSelectOffer(activeVariantProductId || product.productId, idx);
                           }
                         }}
                         className={`p-2.5 rounded-none border text-xs transition-all cursor-pointer flex items-center justify-between ${
@@ -892,7 +1128,7 @@ export default function ProductDetailOverlay({
                   <button
                     type="button"
                     onClick={() =>
-                      onCheckout(recommendation, selectedOffer, quantity)
+                      onCheckout(currentRecommendation, selectedOffer, quantity)
                     }
                     disabled={checkingOut || isSelectedVariantOutOfStock}
                     className={`font-cal w-full py-2.5 px-3 rounded-none font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${

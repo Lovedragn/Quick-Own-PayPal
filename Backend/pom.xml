@@ -47,12 +47,6 @@
 			<artifactId>spring-ai-starter-model-google-genai</artifactId>
 		</dependency>
 
-		<!-- Elasticsearch Spring Data -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-elasticsearch</artifactId>
-		</dependency>
-
 		<!-- Spring Boot WebMVC -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

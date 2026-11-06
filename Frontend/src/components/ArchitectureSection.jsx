@@ -3,7 +3,6 @@
 import {
   Server,
   Layers,
-  CheckCircle2,
   Lock,
 } from "lucide-react";
 
@@ -91,11 +90,6 @@ export default function ArchitectureSection() {
                     </li>
                   ))}
                 </ul>
-              </div>
-
-              <div className="mt-8 pt-4 border-t border-zinc-100 text-sm font-mono text-emerald-700 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Verified Architecture Spec</span>
               </div>
             </div>
           );

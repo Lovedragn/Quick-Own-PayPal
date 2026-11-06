@@ -73,9 +73,9 @@ export default function LikesDrawer({
                       }
                     }}
                   >
-                    {imageUrl ? (
+                    {imageUrl && typeof imageUrl === "string" && imageUrl.trim() ? (
                       <Image
-                        src={imageUrl}
+                        src={imageUrl.trim()}
                         alt={product?.name || "Product"}
                         fill
                         unoptimized
