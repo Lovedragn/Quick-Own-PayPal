@@ -1,5 +1,6 @@
 package com.quickown.backend.integration.channel3;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quickown.backend.dto.product.ProductOffer;
@@ -19,6 +20,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -64,7 +67,7 @@ public class Channel3CatalogClient {
     }
 
     try {
-      SearchConfig config = new SearchConfig("agentic", currency != null && !currency.isBlank() && !"ANY".equalsIgnoreCase(currency) ? currency.trim().toUpperCase(Locale.ROOT) : null);
+      SearchConfig config = new SearchConfig("agentic", null);
       String requestBody = objectMapper.writeValueAsString(new SearchRequest(query.trim(), 10, config));
 
       HttpRequest request =
@@ -93,11 +96,53 @@ public class Channel3CatalogClient {
             "Channel3 returned an unexpected response: products array is missing.");
       }
 
-      List<ProductResult> results = new ArrayList<>();
+      List<ProductResult> rawList = new ArrayList<>();
       for (JsonNode productNode : productsNode) {
         ProductResult product = toProductResult(productNode, inStockOnly);
         if (product != null) {
-          results.add(product);
+          rawList.add(product);
+        }
+      }
+
+      List<CompletableFuture<ProductResult>> futures = new ArrayList<>();
+      for (ProductResult product : rawList) {
+        if (product.variants() == null && product.productId() != null && !product.productId().isBlank()) {
+          futures.add(
+              CompletableFuture.supplyAsync(
+                  () -> {
+                    try {
+                      ProductResult full = getProduct(product.productId());
+                      if (full != null && full.variants() != null) {
+                        return new ProductResult(
+                            product.source(),
+                            product.productId(),
+                            product.name(),
+                            product.brand(),
+                            product.category(),
+                            product.description(),
+                            product.imageUrl(),
+                            product.inStock(),
+                            product.offers(),
+                            full.variants(),
+                            product.images() != null && !product.images().isEmpty()
+                                ? product.images()
+                                : full.images());
+                      }
+                    } catch (Exception ignored) {
+                    }
+                    return ensureVariants(product);
+                  }));
+        } else {
+          futures.add(CompletableFuture.completedFuture(ensureVariants(product)));
+        }
+      }
+
+      List<ProductResult> results = new ArrayList<>();
+      for (CompletableFuture<ProductResult> future : futures) {
+        try {
+          results.add(future.get(3, TimeUnit.SECONDS));
+        } catch (Exception e) {
+          // Fallback if timeout
         }
       }
       return List.copyOf(results);
@@ -318,9 +363,25 @@ public class Channel3CatalogClient {
       return null;
     }
     for (JsonNode image : images) {
+      if (image.path("is_main_image").asBoolean(false)) {
+        String cleanedUrl = text(image, "cleaned_url");
+        if (cleanedUrl != null && !cleanedUrl.isBlank()) {
+          return cleanedUrl;
+        }
+      }
+    }
+    for (JsonNode image : images) {
       String cleanedUrl = text(image, "cleaned_url");
       if (cleanedUrl != null && !cleanedUrl.isBlank()) {
         return cleanedUrl;
+      }
+    }
+    for (JsonNode image : images) {
+      if (image.path("is_main_image").asBoolean(false)) {
+        String url = text(image, "url");
+        if (url != null && !url.isBlank()) {
+          return url;
+        }
       }
     }
     for (JsonNode image : images) {
@@ -374,6 +435,28 @@ public class Channel3CatalogClient {
         || normalized.equals("limitedavailability");
   }
 
+  private ProductResult ensureVariants(ProductResult product) {
+    if (product == null || product.variants() != null) {
+      return product;
+    }
+    ProductVariants defaultVariants =
+        ProductResult.createDefaultVariants(
+            product.productId(), product.name(), product.imageUrl(), product.inStock());
+    return new ProductResult(
+        product.source(),
+        product.productId(),
+        product.name(),
+        product.brand(),
+        product.category(),
+        product.description(),
+        product.imageUrl(),
+        product.inStock(),
+        product.offers(),
+        defaultVariants,
+        product.images());
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private record SearchConfig(String mode, String currency) {}
 
   private record SearchRequest(String query, int limit, SearchConfig config) {}

@@ -82,9 +82,9 @@ export default function CartDrawer({
                     }
                   }}
                 >
-                  {item.imageUrl ? (
+                  {item.imageUrl && typeof item.imageUrl === "string" && item.imageUrl.trim() ? (
                     <Image
-                      src={item.imageUrl}
+                      src={item.imageUrl.trim()}
                       alt={item.productName || "Product"}
                       fill
                       unoptimized

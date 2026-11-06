@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import HeaderNav from "@/components/HeaderNav";
 import HeroSearchSection from "@/components/HeroSearchSection";
-import ProductResultsSection from "@/components/ProductResultsSection";
-import FeatureTicker from "@/components/FeatureTicker";
 import ArchitectureSection from "@/components/ArchitectureSection";
 import ProductShowcaseSection from "@/components/ProductShowcaseSection";
 import CartDrawer from "@/components/CartDrawer";
@@ -18,11 +17,7 @@ import {
   useQuantitiesPreference,
   useOrdersPreference,
 } from "@/lib/usePreferences";
-import {
-  getStoredPagination,
-  saveStoredPagination,
-  saveStoredPendingCheckout,
-} from "@/lib/storage";
+import { saveStoredPendingCheckout } from "@/lib/storage";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -45,48 +40,21 @@ async function readApiResponse(response) {
   return data;
 }
 
-function getOffers(recommendation) {
-  const offers = Array.isArray(recommendation.product?.offers)
-    ? [...recommendation.product.offers]
-    : [];
-  const chosen = recommendation.selectedOffer;
-  if (
-    chosen &&
-    !offers.some((offer) => offer.productUrl === chosen.productUrl)
-  ) {
-    offers.unshift(chosen);
-  }
-  return offers.filter(
-    (offer) =>
-      offer &&
-      offer.merchant &&
-      offer.price !== null &&
-      offer.price !== undefined &&
-      offer.currency &&
-      offer.productUrl,
-  );
-}
-
 export default function Home() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
-  const [recommendations, setRecommendations] = useState([]);
-  const [intent, setIntent] = useState(null);
-  const [notice, setNotice] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [checkoutProduct, setCheckoutProduct] = useState("");
   const [error, setError] = useState("");
+  const [checkoutProduct, setCheckoutProduct] = useState("");
   const [selectedOffers, setSelectedOffers] = useState({});
   const [quantities, saveQuantities] = useQuantitiesPreference();
-  const [searchComplete, setSearchComplete] = useState(false);
   const [detailProduct, setDetailProduct] = useState(null);
   const [detailVariantIndex, setDetailVariantIndex] = useState(0);
-  const checkoutAttemptRef = useRef(null);
+  const [uploadedImagePreview, setUploadedImagePreview] = useState(null);
 
   // User Preferences State with Local Storage
   const [cart, saveCart] = useCartPreference();
   const [likedIds, saveLikes] = useLikesPreference();
   const [orders, saveOrders] = useOrdersPreference();
-  const [pagination, setPagination] = useState(() => getStoredPagination());
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLikesOpen, setIsLikesOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
@@ -171,63 +139,53 @@ export default function Home() {
     );
   }, [cart]);
 
-  async function handleSearch(event, overrideQuery) {
+  function handleSearch(event) {
     if (event) event.preventDefault();
-    const searchQuery = (overrideQuery || query).trim();
-    if (!searchQuery) {
-      setError("Please describe what product you are looking for.");
+    const searchQuery = query.trim();
+    if (!searchQuery && !uploadedImagePreview) {
+      setError("Please describe what product you are looking for or upload an image.");
       return;
     }
 
-    setSearching(true);
-    setError("");
-    setNotice("");
-    setRecommendations([]);
-    setIntent(null);
-    setSearchComplete(false);
-
-    try {
-      const response = await fetch(`${API_BASE}/api/ai/recommendations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: searchQuery,
-        }),
-      });
-
-      const data = await readApiResponse(response);
-      const results = Array.isArray(data.recommendations)
-        ? data.recommendations
-        : [];
-      setRecommendations(results);
-      setIntent(data.intent || null);
-      setNotice(data.notice || "");
-      setSearchComplete(true);
-
-      const defaultOffers = {};
-      const updatedQuantities = { ...quantities };
-      results.forEach((rec) => {
-        const product = rec.product;
-        if (!product?.productId) return;
-        const offers = getOffers(rec);
-        const matchIdx = offers.findIndex(
-          (o) => o.productUrl === rec.selectedOffer?.productUrl,
-        );
-        defaultOffers[product.productId] = matchIdx >= 0 ? matchIdx : 0;
-        if (!updatedQuantities[product.productId]) {
-          updatedQuantities[product.productId] = 1;
-        }
-      });
-      setSelectedOffers(defaultOffers);
-      saveQuantities(updatedQuantities);
-    } catch (requestError) {
-      setError(
-        requestError.message ||
-          "Could not reach the shopping service. Make sure backend is running.",
-      );
-    } finally {
-      setSearching(false);
+    if (uploadedImagePreview) {
+      try {
+        sessionStorage.setItem("quickown_search_image", uploadedImagePreview);
+      } catch (e) {
+        console.warn("Could not save image to sessionStorage", e);
+      }
     }
+
+    const targetUrl = searchQuery
+      ? `/products?q=${encodeURIComponent(searchQuery)}`
+      : `/products`;
+    router.push(targetUrl);
+  }
+
+  function handleImageSearch(file) {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      setUploadedImagePreview(dataUrl);
+      try {
+        sessionStorage.setItem("quickown_search_image", dataUrl);
+      } catch (e) {
+        console.warn("Could not save image to sessionStorage", e);
+      }
+      const targetUrl = query.trim()
+        ? `/products?q=${encodeURIComponent(query.trim())}`
+        : `/products`;
+      router.push(targetUrl);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleClearImage() {
+    setUploadedImagePreview(null);
+    try {
+      sessionStorage.removeItem("quickown_search_image");
+    } catch {}
   }
 
   function selectOffer(productId, offerIndex) {
@@ -241,7 +199,6 @@ export default function Home() {
       [productId]: clamped,
     });
 
-    // Also sync existing item in cart if present
     const inCart = cart.some((item) => item.productId === productId);
     if (inCart) {
       const nextCart = cart.map((item) => {
@@ -251,89 +208,6 @@ export default function Home() {
         return item;
       });
       saveCart(nextCart);
-    }
-  }
-
-  async function beginCheckout(recommendation, offer, quantity) {
-    const product = recommendation?.product;
-    if (!product?.productId || !offer?.merchant || !offer?.productUrl) {
-      setError(
-        "The selected product offer is missing required catalogue details.",
-      );
-      return;
-    }
-
-    setCheckoutProduct(product.productId);
-    setError("");
-
-    try {
-      const cartFingerprint = `${product.productId}:${offer.productUrl}:${quantity}`;
-      if (
-        !checkoutAttemptRef.current ||
-        checkoutAttemptRef.current.fingerprint !== cartFingerprint
-      ) {
-        const idempotencyKey =
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `quickown-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        checkoutAttemptRef.current = {
-          fingerprint: cartFingerprint,
-          key: idempotencyKey,
-        };
-      }
-      const idempotencyKey = checkoutAttemptRef.current.key;
-
-      const response = await fetch(`${API_BASE}/api/checkout/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
-        },
-        body: JSON.stringify({
-          items: [
-            {
-              productId: product.productId,
-              productName: product.name,
-              merchantDomain: offer.merchant,
-              quantity,
-              offerUrl: offer.productUrl,
-            },
-          ],
-        }),
-      });
-      const order = await readApiResponse(response);
-
-      if (!order.approvalUrl) {
-        throw new Error("PayPal did not return an approval link.");
-      }
-
-      saveStoredPendingCheckout({
-        orderId: order.orderId,
-        items: [
-          {
-            productId: product.productId,
-            name: product.name,
-            imageUrl: product.imageUrl,
-            merchant: offer.merchant,
-            price: offer.price,
-            currency: offer.currency,
-            quantity,
-            offerUrl: offer.productUrl,
-          },
-        ],
-        total: offer.price ? Number(offer.price) * quantity : null,
-        currency: offer.currency || "USD",
-        source: "direct",
-      });
-
-      checkoutAttemptRef.current = null;
-      window.location.assign(order.approvalUrl);
-    } catch (requestError) {
-      setError(
-        requestError.message ||
-          "Could not create the PayPal Sandbox order. Please try again.",
-      );
-      setCheckoutProduct("");
     }
   }
 
@@ -425,41 +299,12 @@ export default function Home() {
           query={query}
           setQuery={setQuery}
           onSearch={handleSearch}
-          searching={searching}
           error={error}
           onErrorDismiss={() => setError("")}
+          onImageSearch={handleImageSearch}
+          imagePreview={uploadedImagePreview}
+          onClearImage={handleClearImage}
         />
-
-        {/* Product Results (Divided as grid section) */}
-        {searchComplete && !searching && (
-          <main className="w-full px-4 sm:px-6 py-10 border-b border-zinc-200 bg-zinc-50/40">
-            <div className="max-w-6xl mx-auto">
-              <ProductResultsSection
-                recommendations={recommendations}
-                intent={intent}
-                query={query}
-                setQuery={setQuery}
-                onSearch={handleSearch}
-                selectedOffers={selectedOffers}
-                onSelectOffer={selectOffer}
-                quantities={quantities}
-                onQuantityChange={changeQuantity}
-                onCheckout={beginCheckout}
-                checkoutProduct={checkoutProduct}
-                likedIds={likedIds}
-                onToggleLike={handleToggleLike}
-                onAddToCart={handleAddToCart}
-                onOpenDetail={(rec, swatchIdx) => {
-                  setDetailProduct(rec);
-                  setDetailVariantIndex(swatchIdx || 0);
-                }}
-              />
-            </div>
-          </main>
-        )}
-
-        {/* Key Feature Ticker */}
-        <FeatureTicker />
 
         {/* Product Showcase Section (Shadcn UI Cards + Savings & Speed Recharts Chart) */}
         <ProductShowcaseSection />
@@ -492,7 +337,7 @@ export default function Home() {
         isOpen={isLikesOpen}
         onClose={() => setIsLikesOpen(false)}
         likedIds={likedIds}
-        recommendations={recommendations}
+        recommendations={[]}
         onToggleLike={handleToggleLike}
         onOpenDetail={(rec, swatchIdx) => {
           setDetailProduct(rec);
@@ -519,8 +364,8 @@ export default function Home() {
           onSelectOffer={selectOffer}
           quantity={quantities[detailProduct.product?.productId] ?? 1}
           onQuantityChange={changeQuantity}
-          onCheckout={beginCheckout}
-          checkingOut={checkoutProduct === detailProduct.product?.productId}
+          onCheckout={() => {}}
+          checkingOut={false}
           initialVariantIndex={detailVariantIndex}
           isLiked={likedIds.includes(detailProduct.product?.productId)}
           onToggleLike={handleToggleLike}
