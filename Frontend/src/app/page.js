@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import HeaderNav from "@/components/HeaderNav";
 import HeroSearchSection from "@/components/HeroSearchSection";
 import ProductResultsSection from "@/components/ProductResultsSection";
-import FeatureTicker from "@/components/FeatureTicker";
 import ArchitectureSection from "@/components/ArchitectureSection";
 import ProductShowcaseSection from "@/components/ProductShowcaseSection";
 import CartDrawer from "@/components/CartDrawer";
@@ -63,6 +62,7 @@ export default function Home() {
   const [searchComplete, setSearchComplete] = useState(false);
   const [detailProduct, setDetailProduct] = useState(null);
   const [detailVariantIndex, setDetailVariantIndex] = useState(0);
+  const [uploadedImagePreview, setUploadedImagePreview] = useState(null);
   const checkoutAttemptRef = useRef(null);
 
   // User Preferences State with Local Storage
@@ -157,8 +157,8 @@ export default function Home() {
   async function handleSearch(event, overrideQuery) {
     if (event) event.preventDefault();
     const searchQuery = (overrideQuery || query).trim();
-    if (!searchQuery) {
-      setError("Please describe what product you are looking for.");
+    if (!searchQuery && !uploadedImagePreview) {
+      setError("Please describe what product you are looking for or upload an image.");
       return;
     }
 
@@ -170,15 +170,32 @@ export default function Home() {
     setSearchComplete(false);
 
     try {
-      const response = await fetch(`${API_BASE}/api/ai/recommendations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: searchQuery,
-        }),
-      });
+      let data;
+      if (uploadedImagePreview) {
+        const response = await fetch("/api/products/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base64Image: uploadedImagePreview,
+            query: searchQuery || undefined,
+            limit: 10,
+          }),
+        });
+        data = await readApiResponse(response);
+        if (!data.success) {
+          throw new Error(data.error || "Failed to search products by image.");
+        }
+      } else {
+        const response = await fetch(`${API_BASE}/api/ai/recommendations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: searchQuery,
+          }),
+        });
+        data = await readApiResponse(response);
+      }
 
-      const data = await readApiResponse(response);
       const results = Array.isArray(data.recommendations)
         ? data.recommendations
         : [];
@@ -211,6 +228,82 @@ export default function Home() {
     } finally {
       setSearching(false);
     }
+  }
+
+  async function handleImageSearch(file) {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result;
+      setUploadedImagePreview(dataUrl);
+
+      setSearching(true);
+      setError("");
+      setNotice("");
+      setRecommendations([]);
+      setIntent({
+        intentSummary: `Visual search for "${file.name}"`,
+        category: "Image Search",
+        budget: null,
+        constraints: ["visual_match"],
+      });
+      setSearchComplete(false);
+
+      try {
+        const response = await fetch("/api/products/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base64Image: dataUrl,
+            query: query.trim() || undefined,
+            limit: 10,
+          }),
+        });
+
+        const data = await readApiResponse(response);
+        if (!data.success) {
+          throw new Error(data.error || "Failed to search products by image.");
+        }
+
+        const results = Array.isArray(data.recommendations)
+          ? data.recommendations
+          : [];
+        setRecommendations(results);
+        if (data.intent) setIntent(data.intent);
+        if (data.notice) setNotice(data.notice);
+        setSearchComplete(true);
+
+        const defaultOffers = {};
+        const updatedQuantities = { ...quantities };
+        results.forEach((rec) => {
+          const product = rec.product;
+          if (!product?.productId) return;
+          const offers = getOffers(rec);
+          const matchIdx = offers.findIndex(
+            (o) => o.productUrl === rec.selectedOffer?.productUrl,
+          );
+          defaultOffers[product.productId] = matchIdx >= 0 ? matchIdx : 0;
+          if (!updatedQuantities[product.productId]) {
+            updatedQuantities[product.productId] = 1;
+          }
+        });
+        setSelectedOffers(defaultOffers);
+        saveQuantities(updatedQuantities);
+      } catch (requestError) {
+        setError(
+          requestError.message ||
+            "Could not search with the uploaded image. Please try again.",
+        );
+      } finally {
+        setSearching(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleClearImage() {
+    setUploadedImagePreview(null);
   }
 
   function selectOffer(productId, offerIndex) {
@@ -411,6 +504,9 @@ export default function Home() {
           searching={searching}
           error={error}
           onErrorDismiss={() => setError("")}
+          onImageSearch={handleImageSearch}
+          imagePreview={uploadedImagePreview}
+          onClearImage={handleClearImage}
         />
 
         {/* Product Results (Divided as grid section) */}
@@ -440,9 +536,6 @@ export default function Home() {
             </div>
           </main>
         )}
-
-        {/* Key Feature Ticker */}
-        <FeatureTicker />
 
         {/* Product Showcase Section (Shadcn UI Cards + Savings & Speed Recharts Chart) */}
         <ProductShowcaseSection />
