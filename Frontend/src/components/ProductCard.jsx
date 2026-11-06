@@ -11,6 +11,7 @@ import {
   Scale,
   Heart,
   ShoppingCart,
+  ImageIcon,
 } from "lucide-react";
 import IconButton from "@/components/ui/icon-button";
 import {
@@ -67,6 +68,7 @@ export default function ProductCard({
   const [compared, setCompared] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [justAddedToCart, setJustAddedToCart] = useState(false);
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
   const sidePanelRef = useRef(null);
 
   const product = recommendation.product;
@@ -277,6 +279,12 @@ export default function ProductCard({
       null;
   }
 
+  const [prevImage, setPrevImage] = useState(currentImage);
+  if (prevImage !== currentImage) {
+    setPrevImage(currentImage);
+    setIsImageLoaded(false);
+  }
+
   const MAX_VISIBLE_SWATCHES = 6;
   const visibleSwatches = swatches.slice(0, MAX_VISIBLE_SWATCHES);
   const overflowSwatches = swatches.length - visibleSwatches.length;
@@ -393,14 +401,25 @@ export default function ProductCard({
             </div>
           )}
 
+          {/* Wave Shimmer Alt Image Placeholder while image loads */}
+          {!isImageLoaded && (
+            <div
+              className="absolute inset-0 z-0 shimmer-wave flex flex-col items-center justify-center pointer-events-none"
+              aria-hidden="true"
+            >
+              <ImageIcon className="w-9 h-9 text-zinc-300/80" strokeWidth={1.5} />
+            </div>
+          )}
+
           {Boolean(currentImage && typeof currentImage === "string" && currentImage.trim()) ? (
             <Image
               src={currentImage.trim()}
               alt={activeVariant?.label || product.name || "Product"}
               fill
               unoptimized
-              className="object-contain w-full h-full p-2 group-hover:scale-105 transition-transform duration-300"
+              onLoad={() => setIsImageLoaded(true)}
               onError={(e) => {
+                setIsImageLoaded(true);
                 const target = e.currentTarget;
                 if (target.src && target.src.includes("/cleaned/v1/")) {
                   target.src = target.src.replace("/cleaned/v1/", "/");
@@ -408,6 +427,9 @@ export default function ProductCard({
                   target.src = primaryCleanedImage;
                 }
               }}
+              className={`object-contain w-full h-full p-2 group-hover:scale-105 transition-all duration-300 ${
+                isImageLoaded ? "opacity-100" : "opacity-0"
+              }`}
             />
           ) : (
             <div className="text-3xl font-cal text-slate-300 font-bold">Q</div>

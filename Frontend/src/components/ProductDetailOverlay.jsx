@@ -183,7 +183,9 @@ export default function ProductDetailOverlay({
   const colorOption = variantData.colorOption;
   const colorValues = colorOption?.values || [];
 
-  useEffect(() => {
+  const [prevVariant, setPrevVariant] = useState(initialVariantIndex);
+  if (prevVariant !== initialVariantIndex) {
+    setPrevVariant(initialVariantIndex);
     if (
       typeof initialVariantIndex === "string" &&
       initialVariantIndex &&
@@ -203,7 +205,7 @@ export default function ProductDetailOverlay({
         [colorOption.name]: colorOption.values[initialVariantIndex].label,
       }));
     }
-  }, [initialVariantIndex, colorOption]);
+  }
 
   const selectedOptions = useMemo(
     () => ({ ...(variantData?.selectedMap || {}), ...userSelectedOptions }),

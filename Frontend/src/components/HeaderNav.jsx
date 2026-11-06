@@ -32,24 +32,24 @@ export default function HeaderNav({
         </Link>
 
         <nav className="hidden md:flex items-center gap-7 text-xs font-cal font-semibold uppercase tracking-wider text-zinc-600">
-          <a
-            href="#product-features"
+          <Link
+            href="/#product-features"
             className="hover:text-zinc-950 transition-colors"
           >
             Product
-          </a>
-          <a
-            href="#savings-speed"
+          </Link>
+          <Link
+            href="/#savings-speed"
             className="hover:text-zinc-950 transition-colors"
           >
             Savings & Speed
-          </a>
-          <a
-            href="#architecture"
+          </Link>
+          <Link
+            href="/#architecture"
             className="hover:text-zinc-950 transition-colors"
           >
             Architecture
-          </a>
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">

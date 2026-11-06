@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
   ChartContainer,
   ChartTooltip,
@@ -12,8 +14,12 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  ResponsiveContainer,
 } from "recharts";
+
+// Register GSAP ScrollTrigger plugin safely in browser
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
 
 // Shopping Evolution: Quick-Own Shopping vs Manual Shopping benchmark
 const SHOPPING_EVOLUTION_DATA = [
@@ -62,30 +68,65 @@ const evolutionChartConfig = {
 };
 
 export default function ProductShowcaseSection() {
-  const [activeMetricTab, setActiveMetricTab] = useState("savings"); // "savings" | "speed"
   const [chartKey, setChartKey] = useState(0);
   const chartSectionRef = useRef(null);
-  const [hasAnimated, setHasAnimated] = useState(false);
 
   useEffect(() => {
-    const target = chartSectionRef.current;
-    if (!target) return;
+    // GSAP Context ensures reliable cleanup on React remounts
+    const ctx = gsap.context(() => {
+      // 1. ScrollTrigger to trigger the Recharts line animation remount
+      ScrollTrigger.create({
+        trigger: chartSectionRef.current,
+        start: "top 80%",
+        once: true,
+        onEnter: () => {
+          setChartKey((prev) => prev + 1);
+        },
+      });
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && !hasAnimated) {
-            setChartKey((prev) => prev + 1);
-            setHasAnimated(true);
-          }
-        });
-      },
-      { threshold: 0.2 },
-    );
+      // 2. Animate Section Header on scroll
+      gsap.from(".showcase-header", {
+        scrollTrigger: {
+          trigger: ".showcase-header",
+          start: "top 85%",
+          once: true,
+        },
+        y: 28,
+        opacity: 0,
+        duration: 0.8,
+        ease: "power2.out",
+      });
 
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [hasAnimated]);
+      // 3. Animate 4 Metric Tiles with smooth stagger
+      gsap.from(".metric-tile", {
+        scrollTrigger: {
+          trigger: ".metrics-strip",
+          start: "top 85%",
+          once: true,
+        },
+        y: 24,
+        opacity: 0,
+        stagger: 0.1,
+        duration: 0.7,
+        ease: "power2.out",
+      });
+
+      // 4. Animate the Chart Container box
+      gsap.from(".chart-box", {
+        scrollTrigger: {
+          trigger: ".chart-box",
+          start: "top 85%",
+          once: true,
+        },
+        y: 32,
+        opacity: 0,
+        duration: 0.9,
+        ease: "power3.out",
+      });
+    }, chartSectionRef);
+
+    return () => ctx.revert();
+  }, []);
 
   return (
     <section
@@ -100,8 +141,9 @@ export default function ProductShowcaseSection() {
         className="w-full scroll-mt-20"
       >
         <div className="w-full bg-white border-y border-zinc-200 border-x-0 rounded-none shadow-none overflow-hidden">
+          {/* Header */}
           <div className="p-6 sm:p-8 pb-6 border-b border-zinc-200">
-            <div className="max-w-3xl">
+            <div className="showcase-header max-w-3xl">
               <h3 className="font-cal font-bold text-3xl sm:text-4xl text-zinc-950 tracking-tight leading-[1.15]">
                 Speed & Savings Rate
               </h3>
@@ -113,8 +155,8 @@ export default function ProductShowcaseSection() {
           </div>
 
           {/* Metric Highlights Strip - Merged edge-to-edge with side lines, razor sharp table layout */}
-          <div className="w-full grid grid-cols-2 sm:grid-cols-4 border-b border-zinc-200 border-x-0 divide-x divide-y sm:divide-y-0 divide-zinc-200 rounded-none bg-white">
-            <div className="p-5 sm:p-6 rounded-none bg-white hover:bg-zinc-50/50 transition-colors">
+          <div className="metrics-strip w-full grid grid-cols-2 sm:grid-cols-4 border-b border-zinc-200 border-x-0 divide-x divide-y sm:divide-y-0 divide-zinc-200 rounded-none bg-white">
+            <div className="metric-tile p-5 sm:p-6 rounded-none bg-white hover:bg-zinc-50/50 transition-colors">
               <span className="text-sm font-mono text-zinc-500 uppercase tracking-wider block">
                 Average Savings
               </span>
@@ -125,7 +167,7 @@ export default function ProductShowcaseSection() {
                 $72.60 saved per item
               </span>
             </div>
-            <div className="p-5 sm:p-6 rounded-none bg-white hover:bg-zinc-50/50 transition-colors">
+            <div className="metric-tile p-5 sm:p-6 rounded-none bg-white hover:bg-zinc-50/50 transition-colors">
               <span className="text-sm font-mono text-zinc-500 uppercase tracking-wider block">
                 Agent Search Time
               </span>
@@ -136,7 +178,7 @@ export default function ProductShowcaseSection() {
                 Down from 18.5 minutes
               </span>
             </div>
-            <div className="p-5 sm:p-6 rounded-none bg-white hover:bg-zinc-50/50 transition-colors">
+            <div className="metric-tile p-5 sm:p-6 rounded-none bg-white hover:bg-zinc-50/50 transition-colors">
               <span className="text-sm font-mono text-zinc-500 uppercase tracking-wider block">
                 Catalog Volume
               </span>
@@ -147,7 +189,7 @@ export default function ProductShowcaseSection() {
                 Live products indexed
               </span>
             </div>
-            <div className="p-5 sm:p-6 rounded-none bg-white hover:bg-zinc-50/50 transition-colors">
+            <div className="metric-tile p-5 sm:p-6 rounded-none bg-white hover:bg-zinc-50/50 transition-colors">
               <span className="text-sm font-mono text-zinc-500 uppercase tracking-wider block">
                 Checkout Security
               </span>
@@ -162,7 +204,7 @@ export default function ProductShowcaseSection() {
 
           <div className="p-6 sm:p-8">
             {/* Shadcn Line Chart Container */}
-            <div className="w-full h-[380px] sm:h-[420px]">
+            <div className="chart-box w-full h-[380px] sm:h-[420px]">
               <ChartContainer
                 config={evolutionChartConfig}
                 className="h-[380px] sm:h-[420px] w-full"
