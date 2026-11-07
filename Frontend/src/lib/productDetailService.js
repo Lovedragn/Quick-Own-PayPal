@@ -1,3 +1,5 @@
+import { deduplicateImages, buildCleanedUrlMap } from "@/lib/variants";
+
 // In-memory cache for fetched product details & sample images
 const productCache = new Map();
 const pendingFetches = new Map();
@@ -42,11 +44,12 @@ export async function fetchProductSampleImages(productId) {
         }
       }
 
+      const cleanedMap = buildCleanedUrlMap(p);
       const result = {
         productId: p.id || productId,
         title: p.title,
         description: p.description,
-        images: Array.from(new Set(images.filter(Boolean))),
+        images: deduplicateImages(images, cleanedMap),
         rawProduct: p,
       };
 
@@ -68,5 +71,11 @@ export function getCachedProductImages(productId) {
   if (!productId) return null;
   const cached = productCache.get(productId);
   return cached?.images || null;
+}
+
+export function getCachedProduct(productId) {
+  if (!productId) return null;
+  const cached = productCache.get(productId);
+  return cached?.rawProduct || null;
 }
 

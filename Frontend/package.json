@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@channel3/sdk": "^4.6.0",
-    "@elastic/elasticsearch": "^9.5.1",
     "cal-sans": "^2.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

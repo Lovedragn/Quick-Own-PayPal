@@ -57,22 +57,38 @@ public class AgenticShoppingService {
   }
 
   public ShoppingRecommendationResponse recommend(String customerMessage) {
-    // ShoppingIntent intent = intentInterpreter.interpret(customerMessage);
     String rawQuery = customerMessage != null ? customerMessage.trim() : "";
+    ShoppingIntent parsedIntent = null;
+    if (intentInterpreter != null) {
+      try {
+        parsedIntent = intentInterpreter.interpret(customerMessage);
+      } catch (Exception ignored) {
+      }
+    }
     ShoppingIntent intent =
-        new ShoppingIntent(
-            rawQuery,
-            null,
-            List.of(),
-            null,
-            null,
-            false,
-            false,
-            null);
-    String searchCurrency = productCatalogService.getMarketCurrency();
+        parsedIntent != null
+            ? parsedIntent
+            : new ShoppingIntent(
+                rawQuery,
+                null,
+                List.of(),
+                null,
+                null,
+                false,
+                false,
+                null);
+
+    String searchCurrency =
+        intent.budgetCurrency() != null && !intent.budgetCurrency().isBlank()
+            ? intent.budgetCurrency()
+            : productCatalogService.getMarketCurrency();
     List<ProductResult> catalogueResults =
         productCatalogService.search(
-            rawQuery, false, searchCurrency);
+            intent.searchQuery() != null && !intent.searchQuery().isBlank()
+                ? intent.searchQuery()
+                : rawQuery,
+            intent.inStockOnly(),
+            searchCurrency);
 
     // A no-budget request may use a clearly disclosed fallback market when the preferred
     // market has no offers. Never bypass an explicit budget or convert currencies.
