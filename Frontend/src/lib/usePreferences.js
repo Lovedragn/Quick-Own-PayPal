@@ -10,6 +10,9 @@ import {
   saveStoredQuantities,
   getStoredOrders,
   saveStoredOrders,
+  saveStoredConversations,
+  saveStoredActiveConversationId,
+  saveStoredMemories,
 } from "@/lib/storage";
 
 function subscribeCart(callback) {
@@ -134,4 +137,69 @@ export function useOrdersPreference() {
   }
 
   return [orders, saveStoredOrders];
+}
+
+
+function subscribeLocalPreference(eventName, callback) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(eventName, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(eventName, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function parseStoredArray(value) {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function useConversationsPreference() {
+  const conversationsJson = useSyncExternalStore(
+    (callback) =>
+      subscribeLocalPreference("quickown_conversations_updated", callback),
+    () =>
+      typeof window === "undefined"
+        ? "[]"
+        : localStorage.getItem("quickown_conversations") || "[]",
+    () => "[]",
+  );
+  return [
+    parseStoredArray(conversationsJson),
+    saveStoredConversations,
+  ];
+}
+
+export function useActiveConversationPreference() {
+  const conversationId = useSyncExternalStore(
+    (callback) =>
+      subscribeLocalPreference(
+        "quickown_active_conversation_updated",
+        callback,
+      ),
+    () =>
+      typeof window === "undefined"
+        ? null
+        : localStorage.getItem("quickown_active_conversation"),
+    () => null,
+  );
+  return [conversationId, saveStoredActiveConversationId];
+}
+
+export function useMemoriesPreference() {
+  const memoriesJson = useSyncExternalStore(
+    (callback) =>
+      subscribeLocalPreference("quickown_memories_updated", callback),
+    () =>
+      typeof window === "undefined"
+        ? "[]"
+        : localStorage.getItem("quickown_shopping_memories") || "[]",
+    () => "[]",
+  );
+  return [parseStoredArray(memoriesJson), saveStoredMemories];
 }

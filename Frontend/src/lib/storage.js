@@ -7,6 +7,9 @@ const STORAGE_KEYS = {
   QUANTITIES: "quickown_quantities",
   ORDERS: "quickown_orders",
   PENDING_CHECKOUT: "quickown_pending_checkout",
+  CONVERSATIONS: "quickown_conversations",
+  ACTIVE_CONVERSATION: "quickown_active_conversation",
+  MEMORIES: "quickown_shopping_memories",
 };
 
 export function getStoredCart() {
@@ -133,4 +136,79 @@ export function saveStoredPendingCheckout(checkoutInfo) {
   } catch (e) {
     console.error("Failed to save pending checkout to local storage", e);
   }
+}
+
+
+function getStoredJson(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (error) {
+    console.error(`Failed to read ${key} from local storage`, error);
+    return fallback;
+  }
+}
+
+function saveStoredJson(key, value, eventName) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    window.dispatchEvent(new Event(eventName));
+  } catch (error) {
+    console.error(`Failed to save ${key} to local storage`, error);
+  }
+}
+
+export function getStoredConversations() {
+  const conversations = getStoredJson(STORAGE_KEYS.CONVERSATIONS, []);
+  return Array.isArray(conversations) ? conversations : [];
+}
+
+export function saveStoredConversations(conversations) {
+  const safeConversations = Array.isArray(conversations)
+    ? conversations.slice(0, 40)
+    : [];
+  saveStoredJson(
+    STORAGE_KEYS.CONVERSATIONS,
+    safeConversations,
+    "quickown_conversations_updated",
+  );
+}
+
+export function getStoredActiveConversationId() {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(STORAGE_KEYS.ACTIVE_CONVERSATION) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveStoredActiveConversationId(conversationId) {
+  if (typeof window === "undefined") return;
+  try {
+    if (conversationId) {
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_CONVERSATION, conversationId);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_CONVERSATION);
+    }
+    window.dispatchEvent(new Event("quickown_active_conversation_updated"));
+  } catch (error) {
+    console.error("Failed to save active conversation", error);
+  }
+}
+
+export function getStoredMemories() {
+  const memories = getStoredJson(STORAGE_KEYS.MEMORIES, []);
+  return Array.isArray(memories) ? memories : [];
+}
+
+export function saveStoredMemories(memories) {
+  const safeMemories = Array.isArray(memories) ? memories.slice(0, 20) : [];
+  saveStoredJson(
+    STORAGE_KEYS.MEMORIES,
+    safeMemories,
+    "quickown_memories_updated",
+  );
 }

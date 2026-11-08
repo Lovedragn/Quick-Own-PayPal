@@ -17,7 +17,10 @@ import {
   useQuantitiesPreference,
   useOrdersPreference,
 } from "@/lib/usePreferences";
-import { saveStoredPendingCheckout } from "@/lib/storage";
+import {
+  saveStoredPendingCheckout,
+  saveStoredActiveConversationId,
+} from "@/lib/storage";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -155,6 +158,7 @@ export default function Home() {
       }
     }
 
+    saveStoredActiveConversationId(null);
     const targetUrl = searchQuery
       ? `/products?q=${encodeURIComponent(searchQuery)}`
       : `/products`;
@@ -173,6 +177,7 @@ export default function Home() {
       } catch (e) {
         console.warn("Could not save image to sessionStorage", e);
       }
+      saveStoredActiveConversationId(null);
       const targetUrl = query.trim()
         ? `/products?q=${encodeURIComponent(query.trim())}`
         : `/products`;
