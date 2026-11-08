@@ -16,17 +16,34 @@ import LikesDrawer from "@/components/LikesDrawer";
 import OrdersDrawer from "@/components/OrdersDrawer";
 import ProductDetailOverlay from "@/components/ProductDetailOverlay";
 import ProductSkeletonGrid from "@/components/ProductSkeletonGrid";
+import ChatHistoryDrawer from "@/components/ChatHistoryDrawer";
+import MemoryManagerDrawer from "@/components/MemoryManagerDrawer";
 import { Spinner } from "@/components/ui/spinner";
 import IconButton from "@/components/ui/icon-button";
-import { AlertCircle, MessageSquarePlus, Sparkles, X } from "lucide-react";
+import {
+  AlertCircle,
+  Brain,
+  History,
+  MessageSquarePlus,
+  Sparkles,
+  X,
+} from "lucide-react";
 import {
   useCartPreference,
   useLikesPreference,
   useQuantitiesPreference,
   useOrdersPreference,
+  useLikedProductDetailsPreference,
+  useConversationsPreference,
+  useActiveConversationPreference,
+  useMemoriesPreference,
 } from "@/lib/usePreferences";
-import { saveStoredPendingCheckout } from "@/lib/storage";
+import {
+  saveStoredPendingCheckout,
+  createStoredLikedProduct,
+} from "@/lib/storage";
 import { extractNormalizedOffers } from "@/lib/variants";
+import { useSavedProductHydration } from "@/lib/useSavedProductHydration";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -60,6 +77,12 @@ async function readApiResponse(response) {
 
 function getOffers(recommendation) {
   return extractNormalizedOffers(recommendation);
+}
+
+function createConversationId() {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function ProductsView() {
@@ -111,21 +134,283 @@ function ProductsView() {
   // User Preferences State with Local Storage
   const [cart, saveCart] = useCartPreference();
   const [likedIds, saveLikes] = useLikesPreference();
+  const [likedProductDetails, saveLikedProductDetails] =
+    useLikedProductDetailsPreference();
   const [orders, saveOrders] = useOrdersPreference();
+  const [conversations, saveConversations] = useConversationsPreference();
+  const [activeConversationId, saveActiveConversationId] =
+    useActiveConversationPreference();
+  const [memories, saveMemories] = useMemoriesPreference();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLikesOpen, setIsLikesOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isMemoryOpen, setIsMemoryOpen] = useState(false);
+
+  useSavedProductHydration({
+    likedIds,
+    likedProductDetails,
+    saveLikedProductDetails,
+    orders,
+    saveOrders,
+    conversations,
+  });
+
+  const createConversation = useCallback(() => {
+    const now = new Date().toISOString();
+    const conversation = {
+      id: createConversationId(),
+      title: "New conversation",
+      createdAt: now,
+      updatedAt: now,
+      turns: [],
+    };
+    saveConversations([conversation, ...conversations].slice(0, 20));
+    saveActiveConversationId(conversation.id);
+    return conversation.id;
+  }, [conversations, saveConversations, saveActiveConversationId]);
+
+  const persistConversationTurn = useCallback(
+    (turnData) => {
+      const now = new Date().toISOString();
+      let conversationId = activeConversationId;
+      let current = conversations.find((item) => item.id === conversationId);
+
+      if (!current) {
+        conversationId = createConversationId();
+        current = {
+          id: conversationId,
+          title: "New conversation",
+          createdAt: now,
+          updatedAt: now,
+          turns: [],
+        };
+        saveActiveConversationId(conversationId);
+      }
+
+      const recommendations = (turnData.recommendations || [])
+        .slice(0, 8)
+        .map((recommendation) => {
+          const product = recommendation?.product || {};
+          return {
+            ...recommendation,
+            product: {
+              source: product.source,
+              productId: product.productId,
+              name: product.name,
+              brand: product.brand,
+              category: product.category,
+              description: product.description,
+              imageUrl:
+                typeof product.imageUrl === "string" &&
+                !product.imageUrl.startsWith("data:")
+                  ? product.imageUrl
+                  : null,
+              inStock: product.inStock,
+              offers: Array.isArray(product.offers)
+                ? product.offers.slice(0, 5)
+                : [],
+              variants: product.variants || null,
+              images: Array.isArray(product.images)
+                ? product.images.slice(0, 8)
+                : [],
+            },
+          };
+        });
+
+      const turn = {
+        id: createConversationId(),
+        query: turnData.query || "",
+        imageSearch: Boolean(turnData.imageSearch),
+        status: turnData.status || "complete",
+        createdAt: now,
+        resultCount: recommendations.length,
+        recommendations,
+        intent: turnData.intent || null,
+        notice: turnData.notice || "",
+        error: turnData.error || "",
+      };
+      const turns = [...(current.turns || []), turn].slice(-12);
+      const title =
+        current.title && current.title !== "New conversation"
+          ? current.title
+          : (turn.query || "Image search").slice(0, 52);
+
+      const updated = {
+        ...current,
+        title,
+        updatedAt: now,
+        turns,
+      };
+      const next = [
+        updated,
+        ...conversations.filter((item) => item.id !== conversationId),
+      ]
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt || b.createdAt || 0) -
+            new Date(a.updatedAt || a.createdAt || 0),
+        )
+        .slice(0, 20);
+      saveConversations(next);
+      if (conversationId !== activeConversationId) {
+        saveActiveConversationId(conversationId);
+      }
+    },
+    [
+      activeConversationId,
+      conversations,
+      saveActiveConversationId,
+      saveConversations,
+    ],
+  );
+
+  function handleAddMemory(content) {
+    const normalized = content.trim();
+    if (!normalized || memories.length >= 20) return;
+    if (
+      memories.some(
+        (memory) =>
+          memory.content?.trim().toLowerCase() === normalized.toLowerCase(),
+      )
+    ) {
+      return;
+    }
+    saveMemories([
+      {
+        id: createConversationId(),
+        content: normalized.slice(0, 240),
+        enabled: true,
+        createdAt: new Date().toISOString(),
+      },
+      ...memories,
+    ]);
+  }
+
+  function handleToggleMemory(memoryId) {
+    saveMemories(
+      memories.map((memory) =>
+        memory.id === memoryId
+          ? { ...memory, enabled: memory.enabled === false }
+          : memory,
+      ),
+    );
+  }
+
+  function handleDeleteMemory(memoryId) {
+    saveMemories(memories.filter((memory) => memory.id !== memoryId));
+  }
+
+  function handleClearMemories() {
+    saveMemories([]);
+  }
+
+  function handleRenameConversation(conversationId, title) {
+    saveConversations(
+      conversations.map((conversation) =>
+        conversation.id === conversationId
+          ? { ...conversation, title: title.slice(0, 64) }
+          : conversation,
+      ),
+    );
+  }
+
+  function handleDeleteConversation(conversationId) {
+    saveConversations(
+      conversations.filter((conversation) => conversation.id !== conversationId),
+    );
+    if (activeConversationId === conversationId) {
+      saveActiveConversationId(null);
+      setQuery("");
+      setRecommendations([]);
+      setIntent(null);
+      setNotice("");
+      setError("");
+      setSearchComplete(false);
+      lastExecutedKeyRef.current = "::noimg";
+      router.replace("/products", { scroll: false });
+    }
+  }
+
+  function handleClearHistory() {
+    saveConversations([]);
+    saveActiveConversationId(null);
+    setQuery("");
+    setRecommendations([]);
+    setIntent(null);
+    setNotice("");
+    setError("");
+    setSearchComplete(false);
+    lastExecutedKeyRef.current = "::noimg";
+    router.replace("/products", { scroll: false });
+  }
+
+  function handleOpenConversation(conversationId, turnId) {
+    const conversation = conversations.find((item) => item.id === conversationId);
+    if (!conversation) return;
+    const turns = Array.isArray(conversation.turns) ? conversation.turns : [];
+    const latestTurn =
+      turns.find((turn) => turn.id === turnId) || turns[turns.length - 1];
+
+    saveActiveConversationId(conversationId);
+    setUploadedImagePreview(null);
+    try {
+      sessionStorage.removeItem("quickown_search_image");
+    } catch {}
+
+    if (latestTurn) {
+      const restoredQuery = latestTurn.query || "";
+      setQuery(restoredQuery);
+      setRecommendations(latestTurn.recommendations || []);
+      setIntent(latestTurn.intent || null);
+      setNotice(latestTurn.notice || "");
+      setError(latestTurn.error || "");
+      setSearchComplete(latestTurn.status !== "error" ||
+        (latestTurn.recommendations || []).length > 0);
+      const restoredOffers = {};
+      (latestTurn.recommendations || []).forEach((recommendation) => {
+        const productId = recommendation.product?.productId;
+        if (!productId) return;
+        const offers = getOffers(recommendation);
+        const selectedIndex = offers.findIndex(
+          (offer) =>
+            offer.productUrl === recommendation.selectedOffer?.productUrl,
+        );
+        restoredOffers[productId] = selectedIndex >= 0 ? selectedIndex : 0;
+      });
+      setSelectedOffers(restoredOffers);
+      lastExecutedKeyRef.current = `${restoredQuery}::noimg`;
+      router.replace(
+        restoredQuery
+          ? `/products?q=${encodeURIComponent(restoredQuery)}`
+          : "/products",
+        { scroll: false },
+      );
+    } else {
+      setQuery("");
+      setRecommendations([]);
+      setIntent(null);
+      setNotice("");
+      setError("");
+      setSearchComplete(false);
+      lastExecutedKeyRef.current = "::noimg";
+      router.replace("/products", { scroll: false });
+    }
+  }
 
   // Close handler with slide down animation
   const handleClose = useCallback(() => {
     setIsClosing(true);
     setTimeout(() => {
+      saveActiveConversationId(null);
       router.push("/");
     }, 280);
-  }, [router]);
+  }, [router, saveActiveConversationId]);
 
   // Start a fresh product conversation
   const handleNewConversation = useCallback(() => {
+    createConversation();
+
     // 1. Reset query & sync tracker
     setQuery("");
     setPrevUrlQuery("");
@@ -163,7 +448,7 @@ function ProductsView() {
         searchInput.focus();
       }
     }, 50);
-  }, [router]);
+  }, [router, createConversation]);
 
   // Escape key listener to close
   useEffect(() => {
@@ -173,14 +458,24 @@ function ProductsView() {
         !detailProduct &&
         !isCartOpen &&
         !isLikesOpen &&
-        !isOrdersOpen
+        !isOrdersOpen &&
+        !isHistoryOpen &&
+        !isMemoryOpen
       ) {
         handleClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleClose, detailProduct, isCartOpen, isLikesOpen, isOrdersOpen]);
+  }, [
+    handleClose,
+    detailProduct,
+    isCartOpen,
+    isLikesOpen,
+    isOrdersOpen,
+    isHistoryOpen,
+    isMemoryOpen,
+  ]);
 
   // Add Item to Cart
   function handleAddToCart(recommendation, offer, quantity = 1) {
@@ -244,15 +539,28 @@ function ProductsView() {
   }
 
   // Toggle Liked Product
-  function handleToggleLike(productId) {
+  function handleToggleLike(productId, recommendation) {
     if (!productId) return;
-    let nextLikes;
+
     if (likedIds.includes(productId)) {
-      nextLikes = likedIds.filter((id) => id !== productId);
-    } else {
-      nextLikes = [...likedIds, productId];
+      saveLikes(likedIds.filter((id) => id !== productId));
+      const nextDetails = { ...likedProductDetails };
+      delete nextDetails[productId];
+      saveLikedProductDetails(nextDetails);
+      return;
     }
-    saveLikes(nextLikes);
+
+    saveLikes([...likedIds, productId]);
+    const sourceRecommendation =
+      recommendation ||
+      recommendations.find((item) => item.product?.productId === productId);
+    const savedProduct = createStoredLikedProduct(sourceRecommendation);
+    if (savedProduct) {
+      saveLikedProductDetails({
+        ...likedProductDetails,
+        [productId]: savedProduct,
+      });
+    }
   }
 
   const cartTotalAmount = useMemo(() => {
@@ -273,6 +581,19 @@ function ProductsView() {
         return;
       }
 
+      const enabledMemories = memories
+        .filter((memory) => memory.enabled !== false && memory.content?.trim())
+        .slice(0, 10);
+      const memoryContext =
+        enabledMemories.length > 0
+          ? `Shopping preferences to consider when relevant:
+${enabledMemories.map((memory) => `- ${memory.content}`).join("\n")}
+Apply these preferences only when compatible with the current request. Explicit requirements in the current request take priority.`
+          : "";
+      const requestMessage = [activeText, memoryContext]
+        .filter(Boolean)
+        .join("\n\n");
+
       setSearching(true);
       setError("");
       setNotice("");
@@ -288,7 +609,7 @@ function ProductsView() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               base64Image: activeImage,
-              query: activeText || undefined,
+              query: requestMessage || undefined,
               limit: 10,
             }),
           });
@@ -303,7 +624,7 @@ function ProductsView() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              message: activeText,
+              message: requestMessage,
             }),
           });
           data = await readApiResponse(response);
@@ -333,16 +654,38 @@ function ProductsView() {
         });
         setSelectedOffers(defaultOffers);
         saveQuantities(updatedQuantities);
+        persistConversationTurn({
+          query: activeText,
+          imageSearch: Boolean(activeImage),
+          recommendations: results,
+          intent: data.intent || null,
+          notice: data.notice || "",
+          status: "complete",
+        });
       } catch (requestError) {
-        setError(
+        const message =
           requestError.message ||
-            "Could not reach the shopping service. Make sure backend is running.",
-        );
+          "Could not reach the shopping service. Make sure backend is running.";
+        setError(message);
+        persistConversationTurn({
+          query: activeText,
+          imageSearch: Boolean(activeImage),
+          recommendations: [],
+          status: "error",
+          error: message,
+        });
       } finally {
         setSearching(false);
       }
     },
-    [query, uploadedImagePreview, quantities, saveQuantities],
+    [
+      query,
+      uploadedImagePreview,
+      quantities,
+      saveQuantities,
+      memories,
+      persistConversationTurn,
+    ],
   );
 
   // Trigger search on mount or when urlQuery / image source changes
@@ -363,6 +706,7 @@ function ProductsView() {
     const targetQuery = (
       overrideQuery !== undefined ? overrideQuery : query
     ).trim();
+    lastExecutedKeyRef.current = `${targetQuery}::${uploadedImagePreview ? "img" : "noimg"}`;
     if (targetQuery) {
       router.replace(`/products?q=${encodeURIComponent(targetQuery)}`, {
         scroll: false,
@@ -378,6 +722,7 @@ function ProductsView() {
     reader.onload = () => {
       const dataUrl = reader.result;
       setUploadedImagePreview(dataUrl);
+      lastExecutedKeyRef.current = `${query.trim()}::img`;
       executeSearch(query, dataUrl);
     };
     reader.readAsDataURL(file);
@@ -450,7 +795,7 @@ function ProductsView() {
           items: [
             {
               productId: product.productId,
-              productName: product.name,
+              productName: product.name || product.title || product.productName,
               merchantDomain: offer.merchant,
               quantity,
               offerUrl: offer.productUrl,
@@ -469,8 +814,24 @@ function ProductsView() {
         items: [
           {
             productId: product.productId,
-            name: product.name,
+            name: product.name || product.title || product.productName,
+            productName: product.name || product.title || product.productName,
             imageUrl: product.imageUrl,
+            brand: product.brand,
+            category: product.category,
+            description: product.description,
+            product: {
+              source: product.source,
+              productId: product.productId,
+              name: product.name || product.title || product.productName,
+              brand: product.brand,
+              category: product.category,
+              description: product.description,
+              imageUrl: product.imageUrl,
+              offers: Array.isArray(product.offers) ? product.offers.slice(0, 8) : [],
+              images: Array.isArray(product.images) ? product.images.slice(0, 6) : [],
+              inStock: product.inStock,
+            },
             merchant: offer.merchant,
             price: offer.price,
             currency: offer.currency,
@@ -503,7 +864,11 @@ function ProductsView() {
     try {
       const items = cart.map((item) => ({
         productId: item.productId,
-        productName: item.productName,
+        productName:
+          item.productName ||
+          item.recommendation?.product?.name ||
+          item.name ||
+          "Unnamed product",
         merchantDomain: item.merchant,
         quantity: item.quantity,
         offerUrl: item.offerUrl,
@@ -532,8 +897,26 @@ function ProductsView() {
         orderId: order.orderId,
         items: cart.map((item) => ({
           productId: item.productId,
-          name: item.name,
+          name:
+            item.productName ||
+            item.recommendation?.product?.name ||
+            item.name ||
+            "Unnamed product",
+          productName:
+            item.productName ||
+            item.recommendation?.product?.name ||
+            item.name ||
+            "Unnamed product",
           imageUrl: item.imageUrl,
+          brand: item.brand || item.recommendation?.product?.brand,
+          description: item.recommendation?.product?.description,
+          category: item.recommendation?.product?.category,
+          product: item.recommendation?.product || {
+            productId: item.productId,
+            name: item.productName || item.name || "Unnamed product",
+            brand: item.brand,
+            imageUrl: item.imageUrl,
+          },
           merchant: item.merchant,
           price: item.price,
           currency: item.currency,
@@ -574,17 +957,51 @@ function ProductsView() {
         {/* Top Header Bar: Top Left New Conversation Button + Centered Search Bar + Top Right X Close Button */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-zinc-200 py-3.5 px-4 sm:px-6 shadow-[0_4px_20px_-8px_rgba(0,0,0,0.05)]">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4">
-            {/* Top Left: New Conversation Button */}
-            <button
-              type="button"
-              onClick={handleNewConversation}
-              title="Start a new conversation for products"
-              aria-label="New conversation"
-              className="flex items-center gap-1.5 h-9 px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all shadow-2xs flex-shrink-0 cursor-pointer active:scale-95"
-            >
-              <MessageSquarePlus className="w-4 h-4 text-zinc-600" />
-              <span className="hidden sm:inline">New conversation</span>
-            </button>
+            {/* Chat and memory controls */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleNewConversation}
+                title="Start a new conversation"
+                aria-label="New conversation"
+                className="inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all shadow-2xs cursor-pointer active:scale-95"
+              >
+                <MessageSquarePlus className="w-4 h-4 text-zinc-600" />
+                <span className="hidden lg:inline">New</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMemoryOpen(false);
+                  setIsHistoryOpen(true);
+                }}
+                title="Open saved shopping conversations"
+                aria-label="Conversation history"
+                className="relative inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all cursor-pointer"
+              >
+                <History className="w-4 h-4" />
+                <span className="hidden lg:inline">History</span>
+                {conversations.length > 0 && (
+                  <span className="text-[10px] font-bold text-emerald-700">{conversations.length}</span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHistoryOpen(false);
+                  setIsMemoryOpen(true);
+                }}
+                title="Manage remembered shopping preferences"
+                aria-label="Shopping memory"
+                className="relative inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all cursor-pointer"
+              >
+                <Brain className="w-4 h-4" />
+                <span className="hidden lg:inline">Memory</span>
+                {memories.length > 0 && (
+                  <span className="text-[10px] font-bold text-emerald-700">{memories.length}</span>
+                )}
+              </button>
+            </div>
 
             {/* Search Bar matching exact style */}
             <div className="flex-1 max-w-3xl mx-auto">
@@ -700,6 +1117,7 @@ function ProductsView() {
                     type="button"
                     onClick={() => {
                       setQuery(item);
+                      lastExecutedKeyRef.current = `${item}::noimg`;
                       router.replace(
                         `/products?q=${encodeURIComponent(item)}`,
                         { scroll: false },
@@ -738,6 +1156,7 @@ function ProductsView() {
         isOpen={isLikesOpen}
         onClose={() => setIsLikesOpen(false)}
         likedIds={likedIds}
+        likedProductDetails={likedProductDetails}
         recommendations={recommendations}
         onToggleLike={handleToggleLike}
         onOpenDetail={(rec, swatchIdx) => {
@@ -755,6 +1174,30 @@ function ProductsView() {
           setDetailProduct(rec);
           setDetailVariantIndex(swatchIdx || 0);
         }}
+      />
+
+      {/* Saved shopping conversations */}
+      <ChatHistoryDrawer
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        onOpenConversation={handleOpenConversation}
+        onCreateConversation={handleNewConversation}
+        onRenameConversation={handleRenameConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onClearHistory={handleClearHistory}
+      />
+
+      {/* Remembered shopping preferences */}
+      <MemoryManagerDrawer
+        isOpen={isMemoryOpen}
+        onClose={() => setIsMemoryOpen(false)}
+        memories={memories}
+        onAddMemory={handleAddMemory}
+        onToggleMemory={handleToggleMemory}
+        onDeleteMemory={handleDeleteMemory}
+        onClearMemories={handleClearMemories}
       />
 
       {/* Product Detail Overlay Modal */}

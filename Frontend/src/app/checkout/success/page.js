@@ -53,14 +53,25 @@ export default function CheckoutSuccessPage() {
           currency: data.currency || (pending ? pending.currency : "USD"),
           total: data.total || (pending ? pending.total : "0.00"),
           date: new Date().toISOString(),
-          items: pending?.items || [
+          items: (pending?.items || [
             {
               name: `Order ${data.orderId || id}`,
               quantity: 1,
               price: data.total,
               currency: data.currency || "USD",
             },
-          ],
+          ]).map((item) => {
+            const productName =
+              item.name ||
+              item.productName ||
+              item.product?.name ||
+              (item.productId ? `Product #${item.productId}` : "Unnamed product");
+            return {
+              ...item,
+              name: productName,
+              productName,
+            };
+          }),
         };
         saveStoredOrders([newOrder, ...existingOrders]);
       }

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 4000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -28,5 +28,9 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4"
-  }
+  },
+  "description": "Next.js customer experience for the Quick-Own AI shopping agent.",
+  "main": "index.js",
+  "author": "",
+  "license": "ISC"
 }
