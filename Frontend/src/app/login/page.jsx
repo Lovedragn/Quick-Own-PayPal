@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Mail, LockKeyhole, ArrowRight, ShieldCheck } from "lucide-react";
 import "../auth.css"
 
@@ -60,7 +61,13 @@ export default function LoginPage() {
         {/* Left Branding Section */}
         <div className="auth-visual">
           <Link href="/" className="auth-brand">
-            <span className="brand-icon">Q</span>
+            <Image
+              src="/icon.svg"
+              alt="QuickOwn"
+              width={34}
+              height={34}
+              className="w-[34px] h-[34px] object-contain"
+            />
             <span>
               Quick<span>Own</span>
             </span>
@@ -204,7 +211,7 @@ export default function LoginPage() {
             </form>
 
             <p className="auth-switch">
-              Don't have an account?
+              Don&apos;t have an account?
               <Link href="/signup">Create an account</Link>
             </p>
 

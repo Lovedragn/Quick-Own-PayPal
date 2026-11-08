@@ -527,7 +527,7 @@ export default function ProductDetailOverlay({
         </div>
 
         {/* Modal Body: 2 Columns */}
-        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+        <div data-lenis-prevent className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-100">
           {/* Left Column: Image Gallery (stays in view) */}
           <div className="md:col-span-6 flex flex-col items-center justify-start p-4 sm:p-6 md:p-8 md:overflow-y-auto">
             {/* Featured Image Canvas with Amazon-Style Hover Zoom Lens */}

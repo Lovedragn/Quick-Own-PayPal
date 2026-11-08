@@ -116,10 +116,24 @@ export default function ArchitectureSection() {
                 </GsapTextReveal>
                 <ul className="space-y-2.5 text-sm text-zinc-600">
                   {layer.items.map((item, i) => (
-                    <li key={i} className="flex items-start gap-2.5">
-                      <span className="text-[#16A34A] font-bold">&bull;</span>
-                      <span className="leading-relaxed">{item}</span>
-                    </li>
+                    <GsapTextReveal
+                      key={i}
+                      as="li"
+                      splitBy="line"
+                      className="w-full"
+                      start="top 90%"
+                      delay={idx * 0.1 + 0.18 + i * 0.08}
+                      duration={0.6}
+                      ease="power3.out"
+                      y="100%"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <span className="text-[#16A34A] font-bold select-none leading-relaxed flex-shrink-0">
+                          &bull;
+                        </span>
+                        <span className="leading-relaxed">{item}</span>
+                      </div>
+                    </GsapTextReveal>
                   ))}
                 </ul>
               </div>
