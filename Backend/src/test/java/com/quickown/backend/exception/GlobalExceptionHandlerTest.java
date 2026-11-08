@@ -66,4 +66,19 @@ class GlobalExceptionHandlerTest {
     assertEquals("CHECKOUT_CONFLICT", response.getBody().error());
     assertNotNull(response.getBody().timestamp());
   }
+
+  @Test
+  void mapsNoResourceFoundToNotFound() {
+    request.setRequestURI("/some/missing/path");
+
+    org.springframework.web.servlet.resource.NoResourceFoundException ex =
+        new org.springframework.web.servlet.resource.NoResourceFoundException(
+            org.springframework.http.HttpMethod.GET, "some/missing/path", "Resource not found");
+
+    ResponseEntity<ApiErrorResponse> response = handler.handleNoResourceFound(ex, request);
+
+    assertEquals(404, response.getStatusCode().value());
+    assertEquals("RESOURCE_NOT_FOUND", response.getBody().error());
+    assertEquals("/some/missing/path", response.getBody().path());
+  }
 }

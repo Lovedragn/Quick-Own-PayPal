@@ -16,14 +16,14 @@ Quick-Own is built for shoppers who know what they need but do not want to repea
 
 ## Main technologies
 
-| Layer | Technology | Responsibility |
-|---|---|---|
-| Frontend | Next.js, React, Tailwind CSS | Natural-language search, recommendations, offer selection and PayPal return/cancel UX |
-| Backend | Java 21, Spring Boot 4, Spring AI | Shopping orchestration, server-side rules, checkout and API responses |
-| AI | Google Gemini via Spring AI | Shopping-intent interpretation |
-| Product data | Channel3 | Product catalogue and merchant-offer discovery |
-| Payments | PayPal Orders v2 Sandbox | OAuth, order creation, buyer approval, capture and status |
-| Optional retailer adapters | Flipkart Affiliate API, Amazon.in Creators API | Additional retailer catalogue offers when eligible credentials are configured |
+| Layer                      | Technology                                     | Responsibility                                                                        |
+| -------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Frontend                   | Next.js, React, Tailwind CSS                   | Natural-language search, recommendations, offer selection and PayPal return/cancel UX |
+| Backend                    | Java 21, Spring Boot 4, Spring AI              | Shopping orchestration, server-side rules, checkout and API responses                 |
+| AI                         | Google Gemini via Spring AI                    | Shopping-intent interpretation                                                        |
+| Product data               | Channel3                                       | Product catalogue and merchant-offer discovery                                        |
+| Payments                   | PayPal Orders v2 Sandbox                       | OAuth, order creation, buyer approval, capture and status                             |
+| Optional retailer adapters | Flipkart Affiliate API, Amazon.in Creators API | Additional retailer catalogue offers when eligible credentials are configured         |
 
 ## Architecture
 
@@ -70,6 +70,7 @@ PayPal capture verification + persisted result
 - PayPal Developer account with a **Sandbox** REST app and a Personal Sandbox buyer account for end-to-end payment testing
 
 Optional providers:
+
 - Flipkart Affiliate registration and Affiliate API token
 - Eligible Amazon Associates account with Amazon.in Creators API access, client credentials and Partner Tag
 
@@ -81,21 +82,21 @@ Do not commit API keys, PayPal client secrets, access tokens, private account da
 
 Configure these variables in the IntelliJ `BackendApplication` run configuration (or the shell that starts Spring Boot):
 
-| Variable | Purpose |
-|---|---|
-| `GEMINI_API_KEY` | Gemini / Spring AI |
-| `CHANNEL3_API_KEY` | Channel3 live catalogue |
-| `PAYPAL_CLIENT_ID` | PayPal Sandbox REST app client ID |
-| `PAYPAL_CLIENT_SECRET` | PayPal Sandbox REST app secret |
-| `PAYPAL_BASE_URL` | Keep at `https://api-m.sandbox.paypal.com` |
-| `PAYPAL_RETURN_URL` | Defaults to `http://localhost:3000/checkout/success` |
-| `PAYPAL_CANCEL_URL` | Defaults to `http://localhost:3000/checkout/cancelled` |
-| `PAYPAL_WEBHOOK_ID` | Optional until signed webhooks are configured |
-| `CATALOG_CURRENCY` | Defaults to `INR` |
-| `CATALOG_FALLBACK_CURRENCY` | Defaults to `USD`; only used for unbudgeted searches with no preferred-market results |
-| `FRONTEND_ORIGINS` | Exact browser origins allowed by CORS; defaults include localhost:3000 and 127.0.0.1:3000 |
-| `FLIPKART_AFFILIATE_ID`, `FLIPKART_AFFILIATE_TOKEN` | Optional Flipkart credentials |
-| `AMAZON_CREATORS_CLIENT_ID`, `AMAZON_CREATORS_CLIENT_SECRET`, `AMAZON_ASSOCIATES_PARTNER_TAG` | Optional Amazon.in credentials |
+| Variable                                                                                      | Purpose                                                                                   |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY`                                                                              | Gemini / Spring AI                                                                        |
+| `CHANNEL3_API_KEY`                                                                            | Channel3 live catalogue                                                                   |
+| `PAYPAL_CLIENT_ID`                                                                            | PayPal Sandbox REST app client ID                                                         |
+| `PAYPAL_CLIENT_SECRET`                                                                        | PayPal Sandbox REST app secret                                                            |
+| `PAYPAL_BASE_URL`                                                                             | Keep at `https://api-m.sandbox.paypal.com`                                                |
+| `PAYPAL_RETURN_URL`                                                                           | Defaults to `http://localhost:3000/checkout/success`                                      |
+| `PAYPAL_CANCEL_URL`                                                                           | Defaults to `http://localhost:3000/checkout/cancelled`                                    |
+| `PAYPAL_WEBHOOK_ID`                                                                           | Optional until signed webhooks are configured                                             |
+| `CATALOG_CURRENCY`                                                                            | Defaults to `INR`                                                                         |
+| `CATALOG_FALLBACK_CURRENCY`                                                                   | Defaults to `USD`; only used for unbudgeted searches with no preferred-market results     |
+| `FRONTEND_ORIGINS`                                                                            | Exact browser origins allowed by CORS; defaults include localhost:3000 and 127.0.0.1:3000 |
+| `FLIPKART_AFFILIATE_ID`, `FLIPKART_AFFILIATE_TOKEN`                                           | Optional Flipkart credentials                                                             |
+| `AMAZON_CREATORS_CLIENT_ID`, `AMAZON_CREATORS_CLIENT_SECRET`, `AMAZON_ASSOCIATES_PARTNER_TAG` | Optional Amazon.in credentials                                                            |
 
 The backend includes `Backend/configure-retailer-credentials.ps1` for entering optional retailer credentials locally. It cannot create or approve affiliate accounts.
 
@@ -104,7 +105,7 @@ The backend includes `Backend/configure-retailer-credentials.ps1` for entering o
 Create `Frontend/.env.local`:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+API_BASE_URL=http://localhost:8080
 ```
 
 This variable is a public API base URL, not a secret. Never put private API keys in `NEXT_PUBLIC_*` variables.
@@ -168,8 +169,6 @@ npm run build
 
 [![Quick-Own CI](https://github.com/Lovedragn/Quick-Own-PayPal/actions/workflows/ci.yml/badge.svg?branch=Prapitesh)](https://github.com/Lovedragn/Quick-Own-PayPal/actions/workflows/ci.yml)
 
-
-
 GitHub Actions runs backend tests on Java 21 and frontend ESLint/production-build checks on pushes and pull requests targeting main or Prapitesh. See .github/workflows/ci.yml.
 
 GitHub Actions run #1 for commit ea5f590 passed both jobs: Java 21 backend verification and Node 22 frontend lint/production build. The production dependency audit reports zero vulnerabilities; the development-only audit reports moderate ESLint-chain advisories and no high or critical findings.
@@ -182,16 +181,16 @@ GitHub Actions run #1 for commit ea5f590 passed both jobs: Java 21 backend verif
 
 ## API overview
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/api/health` | Backend health |
-| GET | `/api/catalog/providers` | Provider configuration status, without exposing credentials |
-| GET | `/api/products/search` | Structured catalogue search |
-| POST | `/api/ai/recommendations` | AI-assisted shopping intent, ranked recommendations and offers |
-| POST | `/api/checkout/orders` | Revalidate selected offer and create PayPal Sandbox order |
-| GET | `/api/checkout/orders/{orderId}/status` | Read status for an order owned by this backend |
-| POST | `/api/checkout/orders/{orderId}/capture` | Verify approval and capture/reconcile the PayPal order |
-| POST | `/api/paypal/webhooks` | Verify and process supported PayPal webhook events |
+| Method | Endpoint                                 | Purpose                                                        |
+| ------ | ---------------------------------------- | -------------------------------------------------------------- |
+| GET    | `/api/health`                            | Backend health                                                 |
+| GET    | `/api/catalog/providers`                 | Provider configuration status, without exposing credentials    |
+| GET    | `/api/products/search`                   | Structured catalogue search                                    |
+| POST   | `/api/ai/recommendations`                | AI-assisted shopping intent, ranked recommendations and offers |
+| POST   | `/api/checkout/orders`                   | Revalidate selected offer and create PayPal Sandbox order      |
+| GET    | `/api/checkout/orders/{orderId}/status`  | Read status for an order owned by this backend                 |
+| POST   | `/api/checkout/orders/{orderId}/capture` | Verify approval and capture/reconcile the PayPal order         |
+| POST   | `/api/paypal/webhooks`                   | Verify and process supported PayPal webhook events             |
 
 ### Checkout request
 

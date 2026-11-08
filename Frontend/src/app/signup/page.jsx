@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -10,10 +9,13 @@ import { Mail, LockKeyhole, ArrowRight, ShieldCheck } from "lucide-react";
 import GoogleAuthButton from "@/components/auth/GoogleAuthButton";
 import AuthInput from "@/components/auth/AuthInput";
 import GsapTextReveal from "@/components/ui/GsapTextReveal";
+import { signUpWithPassword, isSupabaseConfigured } from "@/lib/supabase";
 import "../auth.css";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.API_BASE_URL ||
+  "http://localhost:8080";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -41,22 +43,22 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/api/signup`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.message || "Unable to create account.");
+      if (!isSupabaseConfigured) {
+        throw new Error(
+          "Supabase publishable key missing! Put NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in frontend/.env.local and restart dev server."
+        );
       }
+      const { data, error: authError } = await signUpWithPassword(email, password);
+      if (authError) throw authError;
 
-      router.push("/login");
+      if (data?.session) {
+        router.push("/");
+        router.refresh();
+        return;
+      } else {
+        router.push("/login?message=Check your email to confirm registration");
+        return;
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -67,7 +69,6 @@ export default function SignupPage() {
   return (
     <main className="auth-page">
       <section className="auth-layout">
-
         {/* Left Branding Section */}
         <div className="auth-visual">
           <Link href="/" className="auth-brand">
@@ -112,8 +113,7 @@ export default function SignupPage() {
               duration={0.6}
               y="100%"
             >
-              Discover a smarter way to shop.
-              Get the products you need without
+              Discover a smarter way to shop. Get the products you need without
               paying more than you should.
             </GsapTextReveal>
 
@@ -133,15 +133,12 @@ export default function SignupPage() {
             </div>
           </div>
 
-          <p className="visual-footer">
-            © 2026 QuickOwn. All rights reserved.
-          </p>
+          <p className="visual-footer">© 2026 QuickOwn. All rights reserved.</p>
         </div>
 
         {/* Right Signup Section */}
         <div className="auth-form-section">
           <div className="auth-form-card">
-
             <div className="auth-mobile-brand">
               <Link href="/" className="auth-brand">
                 <span className="brand-icon">Q</span>
@@ -184,7 +181,6 @@ export default function SignupPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="auth-form">
-
               <AuthInput
                 label="Email address"
                 type="email"
@@ -215,9 +211,7 @@ export default function SignupPage() {
                 autoComplete="new-password"
               />
 
-              {error && (
-                <p className="auth-error">{error}</p>
-              )}
+              {error && <p className="auth-error">{error}</p>}
 
               <button
                 type="submit"
@@ -227,7 +221,6 @@ export default function SignupPage() {
                 {loading ? "Creating account..." : "Create account"}
                 {!loading && <ArrowRight size={18} />}
               </button>
-
             </form>
 
             <p className="auth-switch">
@@ -236,13 +229,11 @@ export default function SignupPage() {
             </p>
 
             <p className="auth-terms">
-              By continuing, you agree to our Terms of Service
-              and Privacy Policy.
+              By continuing, you agree to our Terms of Service and Privacy
+              Policy.
             </p>
-
           </div>
         </div>
-
       </section>
     </main>
   );

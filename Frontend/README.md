@@ -23,7 +23,7 @@ Next.js customer experience for the Quick-Own AI shopping agent.
 Create `.env.local` in this directory:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+API_BASE_URL=http://localhost:8080
 ```
 
 This value is a public backend URL, not a secret. Never expose Gemini, Channel3 or PayPal secrets through `NEXT_PUBLIC_*` variables.

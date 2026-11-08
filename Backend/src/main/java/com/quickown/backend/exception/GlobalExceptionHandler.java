@@ -19,6 +19,7 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Central REST exception translation for all controllers.
@@ -142,6 +143,17 @@ public class GlobalExceptionHandler {
         HttpStatus.METHOD_NOT_ALLOWED.value(),
         "METHOD_NOT_ALLOWED",
         "The HTTP method is not supported for this endpoint.",
+        request);
+  }
+
+  @ExceptionHandler(NoResourceFoundException.class)
+  public ResponseEntity<ApiErrorResponse> handleNoResourceFound(
+      NoResourceFoundException exception, HttpServletRequest request) {
+    LOGGER.warn("Resource not found: {}", request.getRequestURI());
+    return response(
+        HttpStatus.NOT_FOUND.value(),
+        "RESOURCE_NOT_FOUND",
+        "The requested resource was not found.",
         request);
   }
 

@@ -27,7 +27,9 @@ import {
 import { useSavedProductHydration } from "@/lib/useSavedProductHydration";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.API_BASE_URL ||
+  "http://localhost:8080";
 
 async function readApiResponse(response) {
   const raw = await response.text();
@@ -172,7 +174,9 @@ export default function Home() {
     if (event) event.preventDefault();
     const searchQuery = query.trim();
     if (!searchQuery && !uploadedImagePreview) {
-      setError("Please describe what product you are looking for or upload an image.");
+      setError(
+        "Please describe what product you are looking for or upload an image.",
+      );
       return;
     }
 
