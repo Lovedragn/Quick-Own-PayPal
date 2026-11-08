@@ -5,6 +5,7 @@ import {
   Layers,
   Lock,
 } from "lucide-react";
+import GsapTextReveal from "@/components/ui/GsapTextReveal";
 
 const ARCHITECTURE_LAYERS = [
   {
@@ -52,14 +53,29 @@ export default function ArchitectureSection() {
       {/* Section Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 mb-8 sm:mb-10">
         <div className="max-w-3xl">
-          <h2 className="font-cal font-bold text-3xl sm:text-4xl text-zinc-950 tracking-tight leading-[1.15]">
+          <GsapTextReveal
+            as="h2"
+            className="font-cal font-bold text-3xl sm:text-4xl text-zinc-950 tracking-tight leading-[1.15]"
+            start="top 85%"
+            stagger={0.05}
+            duration={0.8}
+            rotate={true}
+          >
             End-to-End Autonomous Shopping Pipeline
-          </h2>
-          <p className="mt-4 text-base sm:text-lg text-zinc-600 leading-relaxed">
+          </GsapTextReveal>
+          <GsapTextReveal
+            as="p"
+            className="mt-4 text-base sm:text-lg text-zinc-600 leading-relaxed"
+            start="top 85%"
+            delay={0.15}
+            stagger={0.015}
+            duration={0.6}
+            y="100%"
+          >
             How Quick-Own connects natural language intent reasoning, live
             multi-merchant catalog indexing, and tamper-proof PayPal Sandbox
             checkout.
-          </p>
+          </GsapTextReveal>
         </div>
       </div>
 
@@ -76,12 +92,28 @@ export default function ArchitectureSection() {
                 <div className="w-10 h-10 rounded bg-zinc-100 flex items-center justify-center text-[#16A34A] mb-4">
                   <Icon className="w-5 h-5" />
                 </div>
-                <h3 className="font-cal font-bold text-xl text-zinc-900 leading-snug">
+                <GsapTextReveal
+                  as="h3"
+                  className="font-cal font-bold text-xl text-zinc-900 leading-snug"
+                  start="top 90%"
+                  delay={idx * 0.1}
+                  stagger={0.04}
+                  duration={0.7}
+                  rotate={true}
+                >
                   {layer.title}
-                </h3>
-                <p className="text-sm font-mono text-zinc-500 mb-5 mt-1">
+                </GsapTextReveal>
+                <GsapTextReveal
+                  as="p"
+                  className="text-sm font-mono text-zinc-500 mb-5 mt-1"
+                  start="top 90%"
+                  delay={idx * 0.1 + 0.1}
+                  stagger={0.02}
+                  duration={0.5}
+                  y="100%"
+                >
                   {layer.subtitle}
-                </p>
+                </GsapTextReveal>
                 <ul className="space-y-2.5 text-sm text-zinc-600">
                   {layer.items.map((item, i) => (
                     <li key={i} className="flex items-start gap-2.5">

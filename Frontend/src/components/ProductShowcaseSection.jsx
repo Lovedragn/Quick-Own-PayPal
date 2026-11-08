@@ -8,13 +8,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 
 // Register GSAP ScrollTrigger plugin safely in browser
 if (typeof window !== "undefined") {
@@ -22,33 +16,37 @@ if (typeof window !== "undefined") {
 }
 
 // Shopping Evolution: Quick-Own Shopping vs Manual Shopping benchmark
+const SHOWCASE_TITLE = "Speed & Savings Rate";
+const SHOWCASE_DESCRIPTION =
+  "Quick-Own autonomous agent vs. manual multi-tab shopping across catalog depth and checkout.";
+
 const SHOPPING_EVOLUTION_DATA = [
   {
     stage: "Today",
     quickOwn: 1.5,
     manual: 4.5,
-    quickOwnTime: "1.2s",
+    quickOwnTime: "1.7s",
     manualTime: "18.5m",
   },
   {
     stage: "Price Portal Search",
     quickOwn: 10,
     manual: 7,
-    quickOwnTime: "1.2s",
+    quickOwnTime: "1.7s",
     manualTime: "4.8m",
   },
   {
     stage: "Browser Extensions",
     quickOwn: 14,
     manual: 6,
-    quickOwnTime: "1.2s",
+    quickOwnTime: "1.7s",
     manualTime: "2.0m",
   },
   {
     stage: "Future",
     quickOwn: 32,
     manual: 4,
-    quickOwnTime: "1.2s",
+    quickOwnTime: "1.7s",
     manualTime: "18.5m",
   },
 ];
@@ -74,34 +72,51 @@ export default function ProductShowcaseSection() {
   useEffect(() => {
     // GSAP Context ensures reliable cleanup on React remounts
     const ctx = gsap.context(() => {
-      // 1. ScrollTrigger to trigger the Recharts line animation remount
+      // 1. ScrollTrigger to trigger the Recharts line animation remount ONLY at 50%
       ScrollTrigger.create({
-        trigger: chartSectionRef.current,
-        start: "top 80%",
+        trigger: ".chart-box",
+        start: "top 70%",
         once: true,
         onEnter: () => {
           setChartKey((prev) => prev + 1);
         },
       });
 
-      // 2. Animate Section Header on scroll
-      gsap.from(".showcase-header", {
+      // 2. Text Reveal Animation for Section Header Title & Contents
+      const textRevealTl = gsap.timeline({
         scrollTrigger: {
           trigger: ".showcase-header",
           start: "top 85%",
           once: true,
         },
-        y: 28,
-        opacity: 0,
-        duration: 0.8,
-        ease: "power2.out",
       });
 
-      // 3. Animate 4 Metric Tiles with smooth stagger
+      textRevealTl
+        .from(".showcase-title-word", {
+          y: "130%",
+          opacity: 0,
+          rotateZ: 3,
+          duration: 0.85,
+          stagger: 0.08,
+          ease: "power4.out",
+        })
+        .from(
+          ".showcase-content-word",
+          {
+            y: "120%",
+            opacity: 0,
+            duration: 0.55,
+            stagger: 0.02,
+            ease: "power3.out",
+          },
+          "-=0.55",
+        );
+
+      // 3. Animate 4 Metric Tiles with smooth stagger and counting at 30% into viewport
       gsap.from(".metric-tile", {
         scrollTrigger: {
           trigger: ".metrics-strip",
-          start: "top 85%",
+          start: "top 70%", // Triggers when 30% into viewport from bottom
           once: true,
         },
         y: 24,
@@ -111,17 +126,96 @@ export default function ProductShowcaseSection() {
         ease: "power2.out",
       });
 
-      // 4. Animate the Chart Container box
+      const counters = {
+        savings: 10.6,
+        searchTime: 15.9,
+        catalog: 70,
+        security: 60,
+      };
+
+      const savingsEl = chartSectionRef.current?.querySelector(".stat-savings");
+      const searchTimeEl =
+        chartSectionRef.current?.querySelector(".stat-search-time");
+      const catalogEl = chartSectionRef.current?.querySelector(".stat-catalog");
+      const securityEl =
+        chartSectionRef.current?.querySelector(".stat-security");
+
+      const statsTimeline = gsap.timeline({
+        scrollTrigger: {
+          trigger: ".metrics-strip",
+          start: "top 90%", // Triggers when 30% into viewport from bottom
+          once: true,
+        },
+      });
+
+      statsTimeline.to(
+        counters,
+        {
+          savings: 24.0,
+          duration: 2.2,
+          ease: "circ.out",
+          onUpdate: () => {
+            if (savingsEl)
+              savingsEl.textContent = `${counters.savings.toFixed(1)}%`;
+          },
+        },
+        0.1,
+      );
+
+      // Countdown in descending order: 15.9s -> 1.7s with ease-out
+      statsTimeline.to(
+        counters,
+        {
+          searchTime: 1.7,
+          duration: 2.2,
+          ease: "circ.out",
+          onUpdate: () => {
+            if (searchTimeEl)
+              searchTimeEl.textContent = `${counters.searchTime.toFixed(1)}s`;
+          },
+        },
+        0.1,
+      );
+
+      statsTimeline.to(
+        counters,
+        {
+          catalog: 100,
+          duration: 2.4,
+          ease: "circ.out",
+          onUpdate: () => {
+            if (catalogEl)
+              catalogEl.textContent = `${Math.round(counters.catalog)}M+`;
+          },
+        },
+        0.1,
+      );
+
+      statsTimeline.to(
+        counters,
+        {
+          security: 100,
+          duration: 2.2,
+          ease: "circ.out",
+          onUpdate: () => {
+            if (securityEl)
+              securityEl.textContent = `${Math.round(counters.security)}%`;
+          },
+        },
+        0.1,
+      );
+
+      // 4. Animate the Chart Container box ONLY at 50%
       gsap.from(".chart-box", {
         scrollTrigger: {
           trigger: ".chart-box",
-          start: "top 85%",
+          start: "top 100%",
           once: true,
         },
         y: 32,
         opacity: 0,
         duration: 0.9,
-        ease: "power3.out",
+        ease: "circ.out",
       });
     }, chartSectionRef);
 
@@ -144,12 +238,39 @@ export default function ProductShowcaseSection() {
           {/* Header */}
           <div className="p-6 sm:p-8 pb-6 border-b border-zinc-200">
             <div className="showcase-header max-w-3xl">
-              <h3 className="font-cal font-bold text-3xl sm:text-4xl text-zinc-950 tracking-tight leading-[1.15]">
-                Speed & Savings Rate
+              <h3
+                className="font-cal font-bold text-3xl sm:text-4xl text-zinc-950 tracking-tight leading-[1.15]"
+                aria-label={SHOWCASE_TITLE}
+              >
+                <span aria-hidden="true" className="inline-block">
+                  {SHOWCASE_TITLE.split(" ").map((word, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-block overflow-hidden mr-[0.28em] py-0.5 align-bottom"
+                    >
+                      <span className="showcase-title-word inline-block will-change-transform">
+                        {word}
+                      </span>
+                    </span>
+                  ))}
+                </span>
               </h3>
-              <p className="mt-3 text-base sm:text-lg text-zinc-600 leading-relaxed">
-                Quick-Own autonomous agent vs. manual multi-tab shopping across
-                catalog depth and checkout.
+              <p
+                className="mt-3 text-base sm:text-lg text-zinc-600 leading-relaxed"
+                aria-label={SHOWCASE_DESCRIPTION}
+              >
+                <span aria-hidden="true" className="inline-block">
+                  {SHOWCASE_DESCRIPTION.split(" ").map((word, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-block overflow-hidden mr-[0.25em] align-baseline"
+                    >
+                      <span className="showcase-content-word inline-block will-change-transform">
+                        {word}
+                      </span>
+                    </span>
+                  ))}
+                </span>
               </p>
             </div>
           </div>
@@ -160,8 +281,8 @@ export default function ProductShowcaseSection() {
               <span className="text-sm font-mono text-zinc-500 uppercase tracking-wider block">
                 Average Savings
               </span>
-              <span className="font-cal font-bold text-2xl sm:text-5xl text-[#16A34A] block mt-1">
-                24.0%
+              <span className="stat-savings font-cal font-bold text-2xl sm:text-5xl text-[#10b981] block mt-1 tabular-nums">
+                10.6%
               </span>
               <span className="text-sm text-zinc-600 block mt-0.5">
                 $72.60 saved per item
@@ -171,8 +292,8 @@ export default function ProductShowcaseSection() {
               <span className="text-sm font-mono text-zinc-500 uppercase tracking-wider block">
                 Agent Search Time
               </span>
-              <span className="font-cal font-bold text-2xl sm:text-5xl text-zinc-900 block mt-1">
-                1.2s
+              <span className="stat-search-time font-cal font-bold text-2xl sm:text-5xl text-[#111827] block mt-1 tabular-nums">
+                15.9s
               </span>
               <span className="text-sm text-zinc-600 block mt-0.5">
                 Down from 18.5 minutes
@@ -182,8 +303,8 @@ export default function ProductShowcaseSection() {
               <span className="text-sm font-mono text-zinc-500 uppercase tracking-wider block">
                 Catalog Volume
               </span>
-              <span className="font-cal font-bold text-2xl sm:text-5xl text-zinc-900 block mt-1">
-                100M+
+              <span className="stat-catalog font-cal font-bold text-2xl sm:text-5xl text-[#111827] block mt-1 tabular-nums">
+                70M+
               </span>
               <span className="text-sm text-zinc-600 block mt-0.5">
                 Live products indexed
@@ -193,8 +314,8 @@ export default function ProductShowcaseSection() {
               <span className="text-sm font-mono text-zinc-500 uppercase tracking-wider block">
                 Checkout Security
               </span>
-              <span className="font-cal font-bold text-2xl sm:text-5xl text-[#4c00ff] block mt-1">
-                100%
+              <span className="stat-security font-cal font-bold text-2xl sm:text-5xl text-[#6366f1] block mt-1 tabular-nums">
+                60%
               </span>
               <span className="text-sm text-zinc-600 block mt-0.5">
                 Cryptographic price lock
@@ -212,7 +333,7 @@ export default function ProductShowcaseSection() {
                 <LineChart
                   key={chartKey}
                   data={SHOPPING_EVOLUTION_DATA}
-                  margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
+                  margin={{ top: 20, right: 24, left: 24, bottom: 10 }}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -226,15 +347,9 @@ export default function ProductShowcaseSection() {
                     interval={0}
                     tick={{ fill: "#475569", fontSize: 13, fontWeight: 500 }}
                     dy={8}
+                    padding={{ left: 24, right: 24 }}
                   />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: "#64748B", fontSize: 13 }}
-                    unit="%"
-                    domain={[0, 35]}
-                    ticks={[0, 7, 14, 21, 28, 35]}
-                  />
+                  <YAxis hide={true} domain={[0, 35]} />
                   <ChartTooltip
                     content={
                       <ChartTooltipContent
@@ -289,8 +404,9 @@ export default function ProductShowcaseSection() {
                     stroke={QUICK_OWN_COLOR}
                     strokeWidth={9}
                     name="Quick-Own Shopping"
+                    dot={false}
                     isAnimationActive={true}
-                    animationDuration={3000}
+                    animationDuration={2500}
                     animationEasing="ease-out"
                   />
                   {/* Manual Shopping - Bright Red Line */}
@@ -300,8 +416,9 @@ export default function ProductShowcaseSection() {
                     stroke={MANUAL_COLOR}
                     strokeWidth={9}
                     name="Manual Shopping"
+                    dot={false}
                     isAnimationActive={true}
-                    animationDuration={4000}
+                    animationDuration={3000}
                     animationEasing="ease-in-out"
                   />
                 </LineChart>
