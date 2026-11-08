@@ -1,5 +1,6 @@
 import localFont from "next/font/local";
 import "./globals.css";
+import SmoothScroll from "@/components/SmoothScroll";
 
 const calSans = localFont({
   src: "./fonts/CalSansVF.woff2",
@@ -10,11 +11,16 @@ const calSans = localFont({
 
 export const metadata = {
   title: "Quick-Own | AI Shopping Agent",
-  icons: {
-    icon: "/favicon.ico",
-  },
   description:
     "Describe what you need, compare catalogue-backed merchant offers, and approve checkout with PayPal Sandbox.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon-black.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/icon-black.svg",
+  },
 };
 
 export default function RootLayout({ children }) {
@@ -28,7 +34,9 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body className={calSans.className} suppressHydrationWarning>{children}</body>
+      <body className={calSans.className} suppressHydrationWarning>
+        <SmoothScroll>{children}</SmoothScroll>
+      </body>
     </html>
   );
 }

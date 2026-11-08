@@ -16,7 +16,6 @@ import LikesDrawer from "@/components/LikesDrawer";
 import OrdersDrawer from "@/components/OrdersDrawer";
 import ProductDetailOverlay from "@/components/ProductDetailOverlay";
 import ProductSkeletonGrid from "@/components/ProductSkeletonGrid";
-import { Spinner } from "@/components/ui/spinner";
 import IconButton from "@/components/ui/icon-button";
 import { AlertCircle, MessageSquarePlus, Sparkles, X } from "lucide-react";
 import {
@@ -117,11 +116,20 @@ function ProductsView() {
   const [isLikesOpen, setIsLikesOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
 
+  // Always ensure page is open and visible on mount or when route changes
+  useEffect(() => {
+    setIsClosing(false);
+    return () => {
+      setIsClosing(false);
+    };
+  }, [searchParams]);
+
   // Close handler with slide down animation
   const handleClose = useCallback(() => {
     setIsClosing(true);
     setTimeout(() => {
       router.push("/");
+      setIsClosing(false);
     }, 280);
   }, [router]);
 
@@ -572,20 +580,17 @@ function ProductsView() {
           +
         </div>
 
-        {/* Top Header Bar: Top Left New Conversation Button + Centered Search Bar + Top Right X Close Button */}
+        {/* Top Header Bar: Top Left X Close Button + Centered Search Bar + Top Right New Conversation Button */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-zinc-200 py-3.5 px-4 sm:px-6 shadow-[0_4px_20px_-8px_rgba(0,0,0,0.05)]">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4">
-            {/* Top Left: New Conversation Button */}
-            <button
-              type="button"
-              onClick={handleNewConversation}
-              title="Start a new conversation for products"
-              aria-label="New conversation"
-              className="flex items-center gap-1.5 h-9 px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all shadow-2xs flex-shrink-0 cursor-pointer active:scale-95"
-            >
-              <MessageSquarePlus className="w-4 h-4 text-zinc-600" />
-              <span className="hidden sm:inline">New conversation</span>
-            </button>
+            {/* Top Left: X Close Button */}
+            <IconButton
+              icon={X}
+              onClick={handleClose}
+              ariaLabel="Close products and return to home"
+              title="Close (ESC)"
+              rounded="none"
+             />
 
             {/* Search Bar matching exact style */}
             <div className="flex-1 max-w-3xl mx-auto">
@@ -606,14 +611,17 @@ function ProductsView() {
               />
             </div>
 
-            {/* Top Right X Button */}
-            <IconButton
-              icon={X}
-              onClick={handleClose}
-              ariaLabel="Close products and return to home"
-              title="Close (ESC)"
-              rounded="none"
-             />
+            {/* Top Right: New Button */}
+            <button
+              type="button"
+              onClick={handleNewConversation}
+              title="Start a new conversation for products"
+              aria-label="New"
+              className="flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all shadow-2xs flex-shrink-0 cursor-pointer active:scale-95"
+            >
+              <MessageSquarePlus className="w-4 h-4 text-zinc-600" />
+              <span>New</span>
+            </button>
           </div>
         </header>
 
@@ -676,6 +684,7 @@ function ProductsView() {
                   setDetailProduct(rec);
                   setDetailVariantIndex(swatchIdx || 0);
                 }}
+                onNewConversation={handleNewConversation}
               />
             </div>
           )}
@@ -688,7 +697,7 @@ function ProductsView() {
               </div>
               <GsapTextReveal
                 as="h2"
-                className="font-cal font-bold text-2xl sm:text-3xl text-zinc-950 mb-3"
+                className="font-cal font-bold text-2xl sm:text-3xl text-zinc-950 mb-6 sm:mb-8"
                 scrollTrigger={false}
                 delay={0.1}
                 stagger={0.05}
@@ -696,18 +705,6 @@ function ProductsView() {
                 rotate={true}
               >
                 Start a New Shopping Conversation
-              </GsapTextReveal>
-              <GsapTextReveal
-                as="p"
-                className="text-sm sm:text-base text-zinc-600 max-w-md mx-auto mb-8 leading-relaxed"
-                scrollTrigger={false}
-                delay={0.25}
-                stagger={0.02}
-                duration={0.6}
-                y="100%"
-              >
-                Type what you are hunting for in the search bar above or choose
-                a popular suggestion to begin:
               </GsapTextReveal>
 
               <div className="flex flex-wrap items-center justify-center gap-2">

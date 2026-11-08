@@ -43,7 +43,7 @@ export default function LikesDrawer({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-4 space-y-3">
+        <div data-lenis-prevent className="flex-1 overflow-y-auto py-4 space-y-3">
           {likedIds.length === 0 ? (
             <div className="py-16 text-center text-slate-400 font-cal text-sm">
               No liked products yet. Tap the heart on any product card!

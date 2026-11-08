@@ -74,7 +74,7 @@ export default function OrdersDrawer({
         </div>
 
         {/* Content list */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-4">
+        <div data-lenis-prevent className="flex-1 overflow-y-auto py-4 space-y-4">
           {orders.length === 0 ? (
             <div className="py-20 text-center text-slate-400 font-cal">
               <ShoppingBag className="w-12 h-12 mx-auto mb-3 text-slate-300 stroke-1" />

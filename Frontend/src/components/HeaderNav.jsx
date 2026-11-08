@@ -20,10 +20,10 @@ export default function HeaderNav({
 }) {
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-zinc-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[68px] flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[68px] relative flex items-center justify-between">
 
         {/* Logo */}
-        <Link href="/" className="inline-flex items-center group" aria-label="QuickOwn Home">
+        <Link href="/" className="inline-flex items-center group z-10" aria-label="QuickOwn Home">
           <Image
             src="/icon-black.svg"
             alt="QuickOwn"
@@ -34,10 +34,10 @@ export default function HeaderNav({
           />
         </Link>
 
-        {/* Navigation */}
-        <nav className="hidden md:flex items-center gap-7 text-xs font-cal font-semibold uppercase tracking-wider text-zinc-600">
+        {/* Navigation - Locked to exact dead center of screen */}
+        <nav className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-8 text-xs font-cal font-semibold uppercase tracking-wider text-zinc-600 z-10 pointer-events-auto">
           <Link
-            href="/#product-features"
+            href="/products"
             className="hover:text-zinc-950 transition-colors"
           >
             Product
@@ -58,7 +58,7 @@ export default function HeaderNav({
           </Link>
         </nav>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 z-10">
 
           {/* Authentication Buttons */}
           <div className="flex items-center gap-1 sm:gap-2 mr-1 sm:mr-2">

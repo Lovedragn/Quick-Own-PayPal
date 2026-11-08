@@ -6,39 +6,41 @@ import IconButton from "@/components/ui/icon-button";
 export function ProductCardSkeleton({ index = 0 }) {
   return (
     <div
-      className="border border-[#e9e9e9] bg-white flex flex-col justify-between overflow-hidden relative shadow-2xs"
-      style={{ animationDelay: `${index * 120}ms` }}
+      className="relative bg-white border border-[#EAECEF] rounded-none flex flex-col h-full overflow-hidden"
+      style={{ animationDelay: `${index * 100}ms` }}
     >
-      {/* Alt Image Holder with Wave-Like Pattern */}
-      <div className="relative w-full aspect-[4/3] bg-[#fafafa] shimmer-wave flex items-center justify-center border-b border-[#f0f0f0] overflow-hidden">
-        <ImageIcon className="w-10 h-10 text-zinc-300/80" strokeWidth={1.75} />
+      {/* Aspect-Square Image Box with Wave Shimmer */}
+      <div className="relative aspect-square w-full bg-[#fafafa] shimmer-wave flex items-center justify-center overflow-hidden">
+        <ImageIcon className="w-9 h-9 text-zinc-300/80" strokeWidth={1.5} />
       </div>
 
-      {/* Content Skeleton */}
-      <div className="bg-white px-3.5 pt-3 pb-3 sm:pb-3.5 flex-1 flex flex-col justify-between border-t border-[#f0f0f0]">
+      {/* Content Section Below Image matching ProductCard */}
+      <div className="bg-white px-3.5 pt-3 pb-3 sm:pb-3.5 flex-1 flex flex-col justify-between border-t border-[#EAECEF]">
         <div>
-          {/* Swatch placeholder dots */}
-          <div className="flex items-center gap-1.5 mb-2.5">
-            <div className="w-3.5 h-3.5 rounded-full shimmer-wave" />
-            <div className="w-3.5 h-3.5 rounded-full shimmer-wave" />
-            <div className="w-3.5 h-3.5 rounded-full shimmer-wave" />
+          {/* Swatches placeholder row matching variant swatches */}
+          <div className="flex items-center gap-1.5 mb-2 px-0.5 overflow-x-auto py-0.5 scrollbar-none">
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-slate-200 shimmer-wave flex-shrink-0" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-slate-200 shimmer-wave flex-shrink-0" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-slate-200 shimmer-wave flex-shrink-0" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-slate-200 shimmer-wave flex-shrink-0" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-slate-200 shimmer-wave flex-shrink-0" />
           </div>
 
-          {/* Product Title placeholder */}
-          <div className="h-4 w-4/5 shimmer-wave mb-2 rounded-none" />
-          <div className="h-3 w-1/2 shimmer-wave mb-3 rounded-none" />
-
-          {/* Merchant Pill placeholder */}
-          <div className="h-6 w-full shimmer-wave mb-3 rounded-none" />
+          {/* Brand & Title placeholders */}
+          <div className="px-0.5">
+            <div className="h-3 w-16 shimmer-wave mb-1.5 rounded-none" />
+            <div className="h-4 w-4/5 shimmer-wave mt-0.5 rounded-none" />
+          </div>
         </div>
 
-        {/* Price & Button row */}
-        <div>
-          <div className="flex items-baseline justify-between mb-3">
-            <div className="h-5 w-20 shimmer-wave rounded-none" />
-            <div className="h-3 w-12 shimmer-wave rounded-none" />
-          </div>
-          <div className="h-9 w-full shimmer-wave rounded-none" />
+        {/* Amount ALWAYS pinned at bottom */}
+        <div className="px-0.5 mt-auto pt-2.5 pb-1 sm:pb-1.5 flex items-baseline justify-between gap-1">
+          <div className="h-6 sm:h-7 lg:h-8 w-24 shimmer-wave rounded-none" />
+        </div>
+
+        {/* Mobile-only Action Bar skeleton */}
+        <div className="sm:hidden mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+          <div className="h-7 w-full shimmer-wave rounded-none" />
         </div>
       </div>
     </div>

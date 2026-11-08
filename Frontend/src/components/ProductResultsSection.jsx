@@ -1,9 +1,18 @@
 "use client";
 
-import { ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown, MessageSquarePlus, Sparkles } from "lucide-react";
 import IconButton from "@/components/ui/icon-button";
 import ProductCard from "@/components/ProductCard";
 import GsapTextReveal from "@/components/ui/GsapTextReveal";
+
+const NO_RESULT_SUGGESTIONS = [
+  "Sony WH-1000XM5 Headphones",
+  "Nike Air Max Sneakers",
+  "Mechanical Keyboard",
+  "Kindle Paperwhite",
+  "Patagonia Fleece Jacket",
+  "Dyson Supersonic Hair Dryer",
+];
 
 export default function ProductResultsSection({
   recommendations,
@@ -21,12 +30,54 @@ export default function ProductResultsSection({
   onToggleLike,
   onAddToCart,
   onOpenDetail,
+  onNewConversation,
 }) {
   if (recommendations.length === 0) {
     return (
       <div id="results" className="w-full mt-8 mb-12">
-        <div className="py-16 text-center text-[#4A5A3F] font-cal text-sm">
-          No catalogue matches returned. Try a broader search prompt!
+        <div className="py-16 sm:py-20 text-center max-w-xl mx-auto px-4 border border-dashed border-zinc-200 bg-zinc-50/60">
+          <div className="w-12 h-12 rounded-full bg-white border border-zinc-200 flex items-center justify-center mx-auto mb-4 text-zinc-600 shadow-2xs">
+            <MessageSquarePlus className="w-6 h-6" />
+          </div>
+          <h3 className="font-cal font-bold text-xl sm:text-2xl text-zinc-950 mb-2">
+            No products found
+          </h3>
+          <p className="text-sm text-zinc-600 mb-6 leading-relaxed">
+            {query
+              ? `We couldn't find any products matching "${query}".`
+              : "No catalogue matches returned for this search."}{" "}
+            Start a fresh conversation or try one of the popular items below:
+          </p>
+
+          {onNewConversation && (
+            <div className="flex justify-center mb-6">
+              <button
+                type="button"
+                onClick={onNewConversation}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-cal font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
+              >
+                <MessageSquarePlus className="w-4 h-4" />
+                <span>Start New Conversation</span>
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-4 border-t border-zinc-200/80">
+            {NO_RESULT_SUGGESTIONS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => {
+                  if (onSearch) {
+                    onSearch(null, item);
+                  }
+                }}
+                className="text-xs px-3 py-1.5 bg-white border border-zinc-200 text-zinc-700 hover:border-zinc-400 hover:bg-zinc-100 font-cal transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );

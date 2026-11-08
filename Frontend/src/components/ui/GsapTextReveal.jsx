@@ -26,8 +26,20 @@ function extractText(node) {
   return "";
 }
 
-// Recursively split children into masked words
-function splitChildren(children, wordClassName = "") {
+// Recursively split children into masked words or line
+function splitChildren(children, wordClassName = "", splitBy = "words") {
+  if (splitBy === "line" || splitBy === "lines") {
+    return (
+      <span className="block overflow-hidden py-0.5 w-full">
+        <span
+          className={`gsap-reveal-word block will-change-transform ${wordClassName}`}
+        >
+          {children}
+        </span>
+      </span>
+    );
+  }
+
   return Children.map(children, (child, idx) => {
     if (typeof child === "string" || typeof child === "number") {
       const text = String(child);
@@ -87,14 +99,15 @@ export default function GsapTextReveal({
   scrollTrigger = true,
   start = "top 85%",
   once = true,
+  splitBy = "words",
   ...props
 }) {
   const containerRef = useRef(null);
 
   const plainText = useMemo(() => extractText(children), [children]);
   const splitContent = useMemo(
-    () => splitChildren(children, wordClassName),
-    [children, wordClassName]
+    () => splitChildren(children, wordClassName, splitBy),
+    [children, wordClassName, splitBy]
   );
 
   useEffect(() => {
@@ -151,7 +164,7 @@ export default function GsapTextReveal({
       {...props}
     >
       <span
-        className="inline-block"
+        className={splitBy === "line" || splitBy === "lines" ? "block w-full" : "inline-block"}
         aria-hidden={plainText ? "true" : undefined}
       >
         {splitContent}
