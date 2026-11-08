@@ -166,9 +166,9 @@ export default function OrdersDrawer({
                     return (
                       <div
                         key={item.productId ? `${item.productId}-${itemIdx}` : itemIdx}
-                        className="flex items-center gap-3 bg-white p-2.5 rounded-lg border border-slate-100"
+                        className="flex items-start gap-3 bg-white p-2.5 rounded-lg border border-slate-100"
                       >
-                        <div className="relative w-12 h-12 shrink-0 bg-slate-50 rounded-md overflow-hidden border border-slate-200">
+                        <div className="relative w-12 h-12 mt-0.5 shrink-0 bg-slate-50 rounded-md overflow-hidden border border-slate-200">
                           {imageUrl && typeof imageUrl === "string" && imageUrl.trim() ? (
                             <Image
                               src={imageUrl.trim()}
@@ -185,7 +185,10 @@ export default function OrdersDrawer({
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-xs font-semibold text-slate-900 truncate">
+                          <h4
+                            title={getOrderProductName(item)}
+                            className="text-xs font-semibold text-slate-900 whitespace-normal break-words leading-4"
+                          >
                             {getOrderProductName(item)}
                           </h4>
                           <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
@@ -201,7 +204,7 @@ export default function OrdersDrawer({
                           </div>
                         </div>
 
-                        <div className="text-right shrink-0">
+                        <div className="text-right shrink-0 whitespace-nowrap">
                           <span className="text-xs font-cal font-bold text-slate-900 block">
                             {formatPrice(
                               item.price ? Number(item.price) * (item.quantity || 1) : null,
