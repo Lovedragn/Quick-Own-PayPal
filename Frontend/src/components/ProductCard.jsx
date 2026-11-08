@@ -393,7 +393,9 @@ export default function ProductCard({
                 rounded="full"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (onToggleLike && product?.productId) onToggleLike(product.productId);
+                  if (onToggleLike && product?.productId) {
+                    onToggleLike(product.productId, recommendation);
+                  }
                 }}
                 ariaLabel="Add to wishlist"
                 title="Add to wishlist"
@@ -562,7 +564,9 @@ export default function ProductCard({
                 rounded="full"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (onToggleLike && product?.productId) onToggleLike(product.productId);
+                  if (onToggleLike && product?.productId) {
+                    onToggleLike(product.productId, recommendation);
+                  }
                 }}
                 ariaLabel="Add to wishlist"
                 title="Add to wishlist"
