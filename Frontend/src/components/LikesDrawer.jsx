@@ -3,6 +3,38 @@
 import Image from "next/image";
 import { Heart, X, Trash2 } from "lucide-react";
 
+const GENERIC_PRODUCT_NAMES = new Set([
+  "accessories", "apparel", "bag", "bags", "clothes", "clothing",
+  "electronics", "fashion", "footwear", "jacket", "jackets",
+  "product", "products", "shirt", "shirts", "shoe", "shoes", "top", "tops",
+]);
+
+function getLikedProductName(product, id) {
+  const candidates = [
+    product?.title,
+    product?.name,
+    product?.productName,
+  ].filter((value) => typeof value === "string" && value.trim());
+  const specificName = candidates.find((value) => {
+    const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    return (
+      normalized &&
+      !GENERIC_PRODUCT_NAMES.has(normalized) &&
+      !normalized.startsWith("product ")
+    );
+  });
+  if (specificName) return specificName;
+  if (product?.description?.trim()) return product.description.trim().slice(0, 100);
+  const category = product?.category;
+  const normalizedCategory =
+    typeof category === "string"
+      ? category.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+      : "";
+  return category && !GENERIC_PRODUCT_NAMES.has(normalizedCategory)
+    ? category
+    : `Product #${id}`;
+}
+
 export default function LikesDrawer({
   isOpen,
   onClose,
@@ -56,7 +88,8 @@ export default function LikesDrawer({
                 likedProductDetails[id] ||
                 null;
               const product = match?.product || null;
-              const imageUrl = product?.imageUrl;
+              const imageUrl = product?.imageUrl || product?.images?.[0];
+              const productName = getLikedProductName(product, id);
 
               return (
                 <div
@@ -78,7 +111,7 @@ export default function LikesDrawer({
                     {imageUrl && typeof imageUrl === "string" && imageUrl.trim() ? (
                       <Image
                         src={imageUrl.trim()}
-                        alt={product?.name || "Product"}
+                        alt={productName}
                         fill
                         unoptimized
                         className="object-cover"
@@ -110,10 +143,10 @@ export default function LikesDrawer({
                     }}
                   >
                     <p className="text-[11px] text-slate-500 font-cal truncate">
-                      {product?.brand || "Saved preference"}
+                      {product?.brand || product?.source || product?.category || "Saved product"}
                     </p>
                     <h4 className="text-xs font-bold font-cal text-slate-900 truncate">
-                      {product?.name || `Product #${id}`}
+                      {productName}
                     </h4>
                   </div>
 

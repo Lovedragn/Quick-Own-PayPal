@@ -22,6 +22,20 @@ class ProductControllerTest {
   }
 
   @Test
+  void returnsProductDetailsForSavedProductId() {
+    var response = controller.getProductById("4");
+
+    assertEquals(200, response.getStatusCode().value());
+    assertEquals("Wireless Headphones 450", response.getBody().name());
+  }
+
+  @Test
+  void returnsNotFoundWhenSavedProductCannotBeResolved() {
+    var response = controller.getProductById("missing-product");
+    assertEquals(404, response.getStatusCode().value());
+  }
+
+  @Test
   void supportsInStockOnlyFilterForFrontend() {
     var results = controller.searchProducts("wireless earbuds", true);
     assertTrue(results.isEmpty());

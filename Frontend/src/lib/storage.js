@@ -87,11 +87,11 @@ export function createStoredLikedProduct(recommendation) {
     product: {
       source: product.source || null,
       productId: product.productId,
-      name: product.name || "Unnamed product",
+      name: product.name || product.title || product.productName || "Unnamed product",
       brand: product.brand || null,
       category: product.category || null,
       description: product.description || null,
-      imageUrl: safeImageUrl(product.imageUrl),
+      imageUrl: safeImageUrl(product.imageUrl) || safeImageUrl(product.images?.[0]),
       inStock: product.inStock,
       offers: Array.isArray(product.offers) ? product.offers.slice(0, 8) : [],
       variants: product.variants || null,

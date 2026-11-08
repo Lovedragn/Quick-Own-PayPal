@@ -17,12 +17,14 @@ import {
   useLikedProductDetailsPreference,
   useQuantitiesPreference,
   useOrdersPreference,
+  useConversationsPreference,
 } from "@/lib/usePreferences";
 import {
   saveStoredPendingCheckout,
   saveStoredActiveConversationId,
   createStoredLikedProduct,
 } from "@/lib/storage";
+import { useSavedProductHydration } from "@/lib/useSavedProductHydration";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -62,9 +64,19 @@ export default function Home() {
   const [likedProductDetails, saveLikedProductDetails] =
     useLikedProductDetailsPreference();
   const [orders, saveOrders] = useOrdersPreference();
+  const [conversations] = useConversationsPreference();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLikesOpen, setIsLikesOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
+
+  useSavedProductHydration({
+    likedIds,
+    likedProductDetails,
+    saveLikedProductDetails,
+    orders,
+    saveOrders,
+    conversations,
+  });
 
   // Add Item to Cart
   function handleAddToCart(recommendation, offer, quantity = 1) {
@@ -239,7 +251,11 @@ export default function Home() {
     try {
       const items = cart.map((item) => ({
         productId: item.productId,
-        productName: item.productName,
+        productName:
+          item.productName ||
+          item.recommendation?.product?.name ||
+          item.name ||
+          "Unnamed product",
         merchantDomain: item.merchant,
         quantity: item.quantity,
         offerUrl: item.offerUrl,
@@ -268,10 +284,26 @@ export default function Home() {
         orderId: order.orderId,
         items: cart.map((item) => ({
           productId: item.productId,
-          name: item.productName || item.name || "Unnamed product",
-          productName: item.productName || item.name || "Unnamed product",
+          name:
+            item.productName ||
+            item.recommendation?.product?.name ||
+            item.name ||
+            "Unnamed product",
+          productName:
+            item.productName ||
+            item.recommendation?.product?.name ||
+            item.name ||
+            "Unnamed product",
           imageUrl: item.imageUrl,
-          brand: item.brand,
+          brand: item.brand || item.recommendation?.product?.brand,
+          description: item.recommendation?.product?.description,
+          category: item.recommendation?.product?.category,
+          product: item.recommendation?.product || {
+            productId: item.productId,
+            name: item.productName || item.name || "Unnamed product",
+            brand: item.brand,
+            imageUrl: item.imageUrl,
+          },
           merchant: item.merchant,
           price: item.price,
           currency: item.currency,

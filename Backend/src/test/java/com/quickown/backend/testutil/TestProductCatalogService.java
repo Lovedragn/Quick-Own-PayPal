@@ -84,6 +84,14 @@ public class TestProductCatalogService extends ProductCatalogService {
   }
 
   @Override
+  public ProductResult findById(String productId) {
+    return TEST_PRODUCTS.stream()
+        .filter(product -> product.productId().equals(productId))
+        .findFirst()
+        .orElse(null);
+  }
+
+  @Override
   public List<ProductResult> search(String query, boolean inStockOnly, String currency) {
     if (query == null || query.isBlank() || query.length() > 250) {
       throw new IllegalArgumentException("query must contain 1-250 characters.");

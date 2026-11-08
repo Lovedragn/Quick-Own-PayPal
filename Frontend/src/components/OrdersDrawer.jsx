@@ -34,6 +34,47 @@ function formatDate(dateStr) {
   }
 }
 
+const GENERIC_PRODUCT_NAMES = new Set([
+  "accessories", "apparel", "bag", "bags", "clothes", "clothing",
+  "electronics", "fashion", "footwear", "jacket", "jackets",
+  "product", "products", "shirt", "shirts", "shoe", "shoes", "top", "tops",
+]);
+
+function getOrderProductName(item) {
+  const candidates = [
+    item.product?.title,
+    item.product?.name,
+    item.product?.productName,
+    item.productName,
+    item.name,
+  ].filter((value) => typeof value === "string" && value.trim());
+
+  const specificName = candidates.find((value) => {
+    const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    return (
+      normalized &&
+      !GENERIC_PRODUCT_NAMES.has(normalized) &&
+      !normalized.startsWith("product ")
+    );
+  });
+  if (specificName) return specificName;
+
+  const description = item.product?.description || item.description;
+  if (typeof description === "string" && description.trim()) {
+    return description.trim().slice(0, 100);
+  }
+
+  const category = item.product?.category || item.category;
+  const normalizedCategory =
+    typeof category === "string"
+      ? category.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+      : "";
+  if (category && !GENERIC_PRODUCT_NAMES.has(normalizedCategory)) {
+    return category;
+  }
+  return item.productId ? `Product #${item.productId}` : "Unnamed product";
+}
+
 export default function OrdersDrawer({
   isOpen,
   onClose,
@@ -117,7 +158,11 @@ export default function OrdersDrawer({
                 {/* Products in this order */}
                 <div className="space-y-2 pt-1">
                   {(order.items || []).map((item, itemIdx) => {
-                    const imageUrl = item.imageUrl || item.thumbnailUrl;
+                    const imageUrl =
+                      item.imageUrl ||
+                      item.product?.imageUrl ||
+                      item.thumbnailUrl ||
+                      item.product?.images?.[0];
                     return (
                       <div
                         key={item.productId ? `${item.productId}-${itemIdx}` : itemIdx}
@@ -127,7 +172,7 @@ export default function OrdersDrawer({
                           {imageUrl && typeof imageUrl === "string" && imageUrl.trim() ? (
                             <Image
                               src={imageUrl.trim()}
-                              alt={item.name || item.productName || "Ordered Product"}
+                              alt={getOrderProductName(item)}
                               fill
                               sizes="48px"
                               className="object-contain p-1"
@@ -141,7 +186,7 @@ export default function OrdersDrawer({
 
                         <div className="flex-1 min-w-0">
                           <h4 className="text-xs font-semibold text-slate-900 truncate">
-                            {item.name || item.productName || item.product?.name || (item.productId ? `Product #${item.productId}` : "Unnamed product")}
+                            {getOrderProductName(item)}
                           </h4>
                           <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
                             <span>Qty: {item.quantity || 1}</span>

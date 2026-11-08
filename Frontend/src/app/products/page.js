@@ -43,6 +43,7 @@ import {
   createStoredLikedProduct,
 } from "@/lib/storage";
 import { extractNormalizedOffers } from "@/lib/variants";
+import { useSavedProductHydration } from "@/lib/useSavedProductHydration";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -145,6 +146,15 @@ function ProductsView() {
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
+
+  useSavedProductHydration({
+    likedIds,
+    likedProductDetails,
+    saveLikedProductDetails,
+    orders,
+    saveOrders,
+    conversations,
+  });
 
   const createConversation = useCallback(() => {
     const now = new Date().toISOString();
@@ -785,7 +795,7 @@ Apply these preferences only when compatible with the current request. Explicit 
           items: [
             {
               productId: product.productId,
-              productName: product.name,
+              productName: product.name || product.title || product.productName,
               merchantDomain: offer.merchant,
               quantity,
               offerUrl: offer.productUrl,
@@ -804,8 +814,24 @@ Apply these preferences only when compatible with the current request. Explicit 
         items: [
           {
             productId: product.productId,
-            name: product.name,
+            name: product.name || product.title || product.productName,
+            productName: product.name || product.title || product.productName,
             imageUrl: product.imageUrl,
+            brand: product.brand,
+            category: product.category,
+            description: product.description,
+            product: {
+              source: product.source,
+              productId: product.productId,
+              name: product.name || product.title || product.productName,
+              brand: product.brand,
+              category: product.category,
+              description: product.description,
+              imageUrl: product.imageUrl,
+              offers: Array.isArray(product.offers) ? product.offers.slice(0, 8) : [],
+              images: Array.isArray(product.images) ? product.images.slice(0, 6) : [],
+              inStock: product.inStock,
+            },
             merchant: offer.merchant,
             price: offer.price,
             currency: offer.currency,
@@ -838,7 +864,11 @@ Apply these preferences only when compatible with the current request. Explicit 
     try {
       const items = cart.map((item) => ({
         productId: item.productId,
-        productName: item.productName,
+        productName:
+          item.productName ||
+          item.recommendation?.product?.name ||
+          item.name ||
+          "Unnamed product",
         merchantDomain: item.merchant,
         quantity: item.quantity,
         offerUrl: item.offerUrl,
@@ -867,10 +897,26 @@ Apply these preferences only when compatible with the current request. Explicit 
         orderId: order.orderId,
         items: cart.map((item) => ({
           productId: item.productId,
-          name: item.productName || item.name || "Unnamed product",
-          productName: item.productName || item.name || "Unnamed product",
+          name:
+            item.productName ||
+            item.recommendation?.product?.name ||
+            item.name ||
+            "Unnamed product",
+          productName:
+            item.productName ||
+            item.recommendation?.product?.name ||
+            item.name ||
+            "Unnamed product",
           imageUrl: item.imageUrl,
-          brand: item.brand,
+          brand: item.brand || item.recommendation?.product?.brand,
+          description: item.recommendation?.product?.description,
+          category: item.recommendation?.product?.category,
+          product: item.recommendation?.product || {
+            productId: item.productId,
+            name: item.productName || item.name || "Unnamed product",
+            brand: item.brand,
+            imageUrl: item.imageUrl,
+          },
           merchant: item.merchant,
           price: item.price,
           currency: item.currency,
