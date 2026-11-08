@@ -16,14 +16,14 @@ No new PayPal order was created during this integration test. The completed Sand
 
 The frontend uses:
 
-`NEXT_PUBLIC_API_BASE_URL` or the local fallback `http://localhost:8080`.
+`API_BASE_URL` or the local fallback `http://localhost:8080`.
 
-| Frontend file / action | HTTP request | Backend controller |
-|---|---|---|
-| `src/app/page.js` — natural-language search | `POST /api/ai/recommendations` | `AgenticShoppingController` |
-| `src/app/page.js` — selected offer checkout | `POST /api/checkout/orders` | `CheckoutController` |
-| `src/app/checkout/success/page.js` — PayPal return | `POST /api/checkout/orders/{orderId}/capture` | `CheckoutController` |
-| `src/app/checkout/cancelled/page.js` | No API call; renders cancellation state | Frontend-only route |
+| Frontend file / action                             | HTTP request                                  | Backend controller          |
+| -------------------------------------------------- | --------------------------------------------- | --------------------------- |
+| `src/app/page.js` — natural-language search        | `POST /api/ai/recommendations`                | `AgenticShoppingController` |
+| `src/app/page.js` — selected offer checkout        | `POST /api/checkout/orders`                   | `CheckoutController`        |
+| `src/app/checkout/success/page.js` — PayPal return | `POST /api/checkout/orders/{orderId}/capture` | `CheckoutController`        |
+| `src/app/checkout/cancelled/page.js`               | No API call; renders cancellation state       | Frontend-only route         |
 
 The recommendation response contract expected by the frontend matches the backend DTOs:
 
@@ -41,14 +41,14 @@ The frontend does not directly call `GET /api/products/search` or `GET /api/cata
 
 A temporary smoke page was served by the running Next.js application at `http://localhost:3000`. Chrome executed these requests to `http://localhost:8080`, so the test exercised browser CORS policy and JSON parsing rather than only server-side HTTP calls.
 
-| Test | Actual result | Status |
-|---|---|---|
-| `GET /api/health` | HTTP 200, `status=UP` | **PASS** |
-| `GET /api/catalog/providers` | HTTP 200, market INR; Channel3 configured; Flipkart and Amazon.in not configured | **PASS** |
-| `GET /api/products/search?query=iPhone%2016&currency=USD` | HTTP 200, 7 catalogue results | **PASS** |
+| Test                                                                                    | Actual result                                                                                             | Status   |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------- |
+| `GET /api/health`                                                                       | HTTP 200, `status=UP`                                                                                     | **PASS** |
+| `GET /api/catalog/providers`                                                            | HTTP 200, market INR; Channel3 configured; Flipkart and Amazon.in not configured                          | **PASS** |
+| `GET /api/products/search?query=iPhone%2016&currency=USD`                               | HTTP 200, 7 catalogue results                                                                             | **PASS** |
 | `POST /api/ai/recommendations` with `{"message":"Find me an iPhone 16 under $700 USD"}` | HTTP 200, one recommendation; product ID, product name, selected merchant, currency and offer URL present | **PASS** |
-| `GET /api/checkout/orders/{id}/status` for the existing Sandbox order | HTTP 200, `COMPLETED`, `buyerApproved=true`, USD 565.00 | **PASS** |
-| `POST /api/checkout/orders` with an empty cart and an idempotency key | HTTP 400, `VALIDATION_ERROR`; no PayPal order created | **PASS** |
+| `GET /api/checkout/orders/{id}/status` for the existing Sandbox order                   | HTTP 200, `COMPLETED`, `buyerApproved=true`, USD 565.00                                                   | **PASS** |
+| `POST /api/checkout/orders` with an empty cart and an idempotency key                   | HTTP 400, `VALIDATION_ERROR`; no PayPal order created                                                     | **PASS** |
 
 The browser was able to POST JSON from the frontend origin to the backend, which confirms the required CORS preflight and actual cross-origin request succeeded.
 

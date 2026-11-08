@@ -99,14 +99,14 @@ export default function OrdersDrawer({
             <h2 className="font-cal font-bold text-lg text-slate-900">
               Ordered Products
             </h2>
-            <span className="text-xs bg-[#E8F4E2] px-2.5 py-0.5 rounded-full font-bold text-[#3F7A2E]">
+            <span className="text-xs bg-[#E8F4E2] px-2 py-0.5 rounded-none border border-[#B6D6A8] font-bold text-[#3F7A2E]">
               {orders.length}
             </span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+            className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 rounded-none border border-transparent hover:border-slate-200 transition-colors cursor-pointer"
             aria-label="Close ordered products"
             title="Close ordered products"
           >
@@ -128,7 +128,7 @@ export default function OrdersDrawer({
             orders.map((order, orderIdx) => (
               <div
                 key={order.orderId || order.id || orderIdx}
-                className="border border-[#D8E5D0] rounded-xl bg-[#FBFDFB] p-4 shadow-xs space-y-3"
+                className="border border-slate-300 rounded-none bg-[#FBFDFB] p-4 space-y-3"
               >
                 {/* Order metadata header */}
                 <div className="flex items-start justify-between gap-2 pb-2 border-b border-slate-100 text-xs">
@@ -136,7 +136,7 @@ export default function OrdersDrawer({
                     <div className="flex items-center gap-1.5 font-bold text-[#17270C]">
                       <CheckCircle2 className="w-3.5 h-3.5 text-[#3F7A2E]" />
                       <span>Order #{order.orderId ? order.orderId.slice(-8) : String(orderIdx + 1)}</span>
-                      <span className="px-1.5 py-0.2 rounded bg-[#E8F4E2] text-[#3F7A2E] text-[10px] uppercase font-bold">
+                      <span className="px-1.5 py-0.2 rounded-none border border-[#B6D6A8] bg-[#E8F4E2] text-[#3F7A2E] text-[10px] uppercase font-bold">
                         {order.status || "COMPLETED"}
                       </span>
                     </div>
@@ -166,9 +166,9 @@ export default function OrdersDrawer({
                     return (
                       <div
                         key={item.productId ? `${item.productId}-${itemIdx}` : itemIdx}
-                        className="flex items-start gap-3 bg-white p-2.5 rounded-lg border border-slate-100"
+                        className="flex items-start gap-3 bg-white p-2.5 rounded-none border border-slate-200"
                       >
-                        <div className="relative w-12 h-12 mt-0.5 shrink-0 bg-slate-50 rounded-md overflow-hidden border border-slate-200">
+                        <div className="relative w-12 h-12 mt-0.5 shrink-0 bg-slate-50 rounded-none overflow-hidden border border-slate-200">
                           {imageUrl && typeof imageUrl === "string" && imageUrl.trim() ? (
                             <Image
                               src={imageUrl.trim()}

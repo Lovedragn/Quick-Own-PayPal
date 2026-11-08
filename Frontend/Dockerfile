@@ -11,8 +11,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Pass build-time environment variable if needed
-ARG NEXT_PUBLIC_API_BASE_URL
-ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+ARG API_BASE_URL
+ENV API_BASE_URL=${API_BASE_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build

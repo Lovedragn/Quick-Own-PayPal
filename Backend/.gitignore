@@ -34,3 +34,9 @@ build/
 .vscode/
 
 src/main/resources/application.properties
+
+# Environment files
+.env
+.env.*
+!.env.example
+

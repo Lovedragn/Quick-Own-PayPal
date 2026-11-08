@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -6,14 +5,17 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Mail, LockKeyhole, ArrowRight, ShieldCheck } from "lucide-react";
-import "../auth.css"
+import "../auth.css";
 
 import GoogleAuthButton from "@/components/auth/GoogleAuthButton";
 import AuthInput from "@/components/auth/AuthInput";
 import GsapTextReveal from "@/components/ui/GsapTextReveal";
+import { signInWithPassword, isSupabaseConfigured } from "@/lib/supabase";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.API_BASE_URL ||
+  "http://localhost:8080";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,24 +31,16 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/api/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.message || "Invalid email or password.");
+      if (!isSupabaseConfigured) {
+        throw new Error(
+          "Supabase publishable key missing! Put NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in frontend/.env.local and restart dev server."
+        );
       }
+      const { error: authError } = await signInWithPassword(email, password);
+      if (authError) throw authError;
 
       router.push("/");
       router.refresh();
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -57,7 +51,6 @@ export default function LoginPage() {
   return (
     <main className="auth-page">
       <section className="auth-layout">
-
         {/* Left Branding Section */}
         <div className="auth-visual">
           <Link href="/" className="auth-brand">
@@ -102,9 +95,8 @@ export default function LoginPage() {
               duration={0.6}
               y="100%"
             >
-              Your smarter shopping experience
-              is just one step away. Sign in and
-              continue where you left off.
+              Your smarter shopping experience is just one step away. Sign in
+              and continue where you left off.
             </GsapTextReveal>
 
             <div className="visual-features">
@@ -123,15 +115,12 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <p className="visual-footer">
-            © 2026 QuickOwn. All rights reserved.
-          </p>
+          <p className="visual-footer">© 2026 QuickOwn. All rights reserved.</p>
         </div>
 
         {/* Right Login Section */}
         <div className="auth-form-section">
           <div className="auth-form-card">
-
             <div className="auth-mobile-brand">
               <Link href="/" className="auth-brand">
                 <span className="brand-icon">Q</span>
@@ -174,7 +163,6 @@ export default function LoginPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="auth-form">
-
               <AuthInput
                 label="Email address"
                 type="email"
@@ -195,9 +183,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
               />
 
-              {error && (
-                <p className="auth-error">{error}</p>
-              )}
+              {error && <p className="auth-error">{error}</p>}
 
               <button
                 type="submit"
@@ -207,7 +193,6 @@ export default function LoginPage() {
                 {loading ? "Signing in..." : "Sign in"}
                 {!loading && <ArrowRight size={18} />}
               </button>
-
             </form>
 
             <p className="auth-switch">
@@ -215,13 +200,9 @@ export default function LoginPage() {
               <Link href="/signup">Create an account</Link>
             </p>
 
-            <p className="auth-terms">
-              Secure login powered by QuickOwn.
-            </p>
-
+            <p className="auth-terms">Secure login powered by QuickOwn.</p>
           </div>
         </div>
-
       </section>
     </main>
   );

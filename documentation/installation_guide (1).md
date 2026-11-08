@@ -1,6 +1,6 @@
 # PayPal Modern Integration & Hackathon Stack Setup Guide
 
-*Next.js Frontend (PayPal JS SDK v6) + Spring Boot Backend + Official Hackathon Partner Tooling (APIMatic, Channel3, Elastic)*
+_Next.js Frontend (PayPal JS SDK v6) + Spring Boot Backend + Official Hackathon Partner Tooling (APIMatic, Channel3, Elastic)_
 
 ---
 
@@ -58,7 +58,7 @@ npm install @elastic/elasticsearch
 ```env
 # PayPal Credentials
 NEXT_PUBLIC_PAYPAL_CLIENT_ID=your_paypal_sandbox_client_id
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+API_BASE_URL=http://localhost:8080
 
 # Hackathon Sponsor API Keys
 APIMATIC_API_KEY=your_apimatic_api_key
@@ -341,10 +341,10 @@ public class ElasticsearchConfig {
 In `frontend/src/lib/elasticsearch.js`:
 
 ```javascript
-import { Client } from '@elastic/elasticsearch';
+import { Client } from "@elastic/elasticsearch";
 
 const client = new Client({
-  node: process.env.ELASTIC_ENDPOINT || 'http://localhost:9200',
+  node: process.env.ELASTIC_ENDPOINT || "http://localhost:9200",
   auth: {
     apiKey: process.env.ELASTIC_API_KEY,
   },
@@ -363,6 +363,7 @@ npx skills add elastic/agent-skills --skill elasticsearch-onboarding -y
 ```
 
 Trigger it in chat using:
+
 - `/elasticsearch-onboarding`
 - Or prompt: `"Help me design the Elasticsearch schema and vector search for my products"`
 
