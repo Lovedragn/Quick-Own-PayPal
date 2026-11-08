@@ -9,6 +9,7 @@ import "../auth.css"
 
 import GoogleAuthButton from "@/components/auth/GoogleAuthButton";
 import AuthInput from "@/components/auth/AuthInput";
+import GsapTextReveal from "@/components/ui/GsapTextReveal";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -72,16 +73,32 @@ export default function LoginPage() {
             </div>
 
             <h1>
-              Shopping
-              <br />
-              <span>made smarter.</span>
+              <GsapTextReveal
+                as="span"
+                scrollTrigger={false}
+                delay={0.1}
+                stagger={0.06}
+                duration={0.8}
+                rotate={true}
+              >
+                Shopping
+                <br />
+                <span>made smarter.</span>
+              </GsapTextReveal>
             </h1>
 
-            <p>
+            <GsapTextReveal
+              as="p"
+              scrollTrigger={false}
+              delay={0.3}
+              stagger={0.02}
+              duration={0.6}
+              y="100%"
+            >
               Your smarter shopping experience
               is just one step away. Sign in and
               continue where you left off.
-            </p>
+            </GsapTextReveal>
 
             <div className="visual-features">
               <div>
@@ -119,10 +136,26 @@ export default function LoginPage() {
 
             <div className="auth-heading">
               <span className="auth-eyebrow">WELCOME BACK</span>
-              <h2>Sign in to QuickOwn</h2>
-              <p>
+              <GsapTextReveal
+                as="h2"
+                scrollTrigger={false}
+                delay={0.2}
+                stagger={0.05}
+                duration={0.75}
+                rotate={true}
+              >
+                Sign in to QuickOwn
+              </GsapTextReveal>
+              <GsapTextReveal
+                as="p"
+                scrollTrigger={false}
+                delay={0.35}
+                stagger={0.02}
+                duration={0.6}
+                y="100%"
+              >
                 Enter your credentials to access your account.
-              </p>
+              </GsapTextReveal>
             </div>
 
             <GoogleAuthButton />

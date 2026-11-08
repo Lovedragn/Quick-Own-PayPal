@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import GsapTextReveal from "@/components/ui/GsapTextReveal";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getStoredOrders,
@@ -103,12 +104,48 @@ export default function CheckoutSuccessPage() {
         </Link>
         <div className="return-icon">{status === "success" ? "✓" : status === "error" ? "!" : "↻"}</div>
         {status === "loading" && <>
-          <h1>Confirming your payment</h1>
-          <p>PayPal returned your order. Quick-Own is verifying approval and asking PayPal to complete the Sandbox capture.</p>
+          <GsapTextReveal
+            as="h1"
+            scrollTrigger={false}
+            delay={0.1}
+            stagger={0.06}
+            duration={0.75}
+            rotate={true}
+          >
+            Confirming your payment
+          </GsapTextReveal>
+          <GsapTextReveal
+            as="p"
+            scrollTrigger={false}
+            delay={0.25}
+            stagger={0.02}
+            duration={0.6}
+            y="100%"
+          >
+            PayPal returned your order. Quick-Own is verifying approval and asking PayPal to complete the Sandbox capture.
+          </GsapTextReveal>
         </>}
         {status === "success" && <>
-          <h1>Payment captured</h1>
-          <p>Your PayPal Sandbox payment was captured successfully. This confirms a payment to the Quick-Own Sandbox merchant; it does not place an order with the external retailer.</p>
+          <GsapTextReveal
+            as="h1"
+            scrollTrigger={false}
+            delay={0.1}
+            stagger={0.06}
+            duration={0.75}
+            rotate={true}
+          >
+            Payment captured
+          </GsapTextReveal>
+          <GsapTextReveal
+            as="p"
+            scrollTrigger={false}
+            delay={0.25}
+            stagger={0.02}
+            duration={0.6}
+            y="100%"
+          >
+            Your PayPal Sandbox payment was captured successfully. This confirms a payment to the Quick-Own Sandbox merchant; it does not place an order with the external retailer.
+          </GsapTextReveal>
           <div className="return-meta">
             <div><span>Payment status</span><strong>{result.status}</strong></div>
             <div><span>Total</span><strong>{result.total} {result.currency}</strong></div>
@@ -118,9 +155,27 @@ export default function CheckoutSuccessPage() {
           <Link className="return-link" href="/">Back to shopping <span>→</span></Link>
         </>}
         {status === "error" && <>
-          <h1>We could not confirm capture</h1>
+          <GsapTextReveal
+            as="h1"
+            scrollTrigger={false}
+            delay={0.1}
+            stagger={0.06}
+            duration={0.75}
+            rotate={true}
+          >
+            We could not confirm capture
+          </GsapTextReveal>
           <p className="return-error">{message}</p>
-          <p>Your order has not been marked as completed by this page. You can safely retry; the backend reconciles an already-completed PayPal capture.</p>
+          <GsapTextReveal
+            as="p"
+            scrollTrigger={false}
+            delay={0.25}
+            stagger={0.02}
+            duration={0.6}
+            y="100%"
+          >
+            Your order has not been marked as completed by this page. You can safely retry; the backend reconciles an already-completed PayPal capture.
+          </GsapTextReveal>
           <button className="return-link" onClick={() => capture(orderIdRef.current)}>Retry verification <span>↻</span></button>
           <div><Link className="return-link" href="/">Back to Quick-Own</Link></div>
         </>}

@@ -23,21 +23,15 @@ export default function HeaderNav({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[68px] flex items-center justify-between">
 
         {/* Logo */}
-        <Link href="/" className="inline-flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-[#0F172A] flex items-center justify-center transition-transform group-hover:scale-105 shadow-sm p-1.5">
-            <Image
-              src="/icon.svg"
-              alt="QuickOwn"
-              width={20}
-              height={20}
-              className="w-full h-full object-contain"
-              priority
-            />
-          </div>
-
-          <span className="font-cal font-bold text-xl tracking-tight text-zinc-900">
-            Quick<span className="text-[#16A34A] font-serif italic">Own</span>
-          </span>
+        <Link href="/" className="inline-flex items-center group" aria-label="QuickOwn Home">
+          <Image
+            src="/icon-black.svg"
+            alt="QuickOwn"
+            width={34}
+            height={34}
+            className="w-[34px] h-[34px] object-contain transition-transform group-hover:scale-105"
+            priority
+          />
         </Link>
 
         {/* Navigation */}
