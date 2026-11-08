@@ -3,6 +3,7 @@
 import { ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import IconButton from "@/components/ui/icon-button";
 import ProductCard from "@/components/ProductCard";
+import GsapTextReveal from "@/components/ui/GsapTextReveal";
 
 export default function ProductResultsSection({
   recommendations,
@@ -35,9 +36,16 @@ export default function ProductResultsSection({
     <div id="results" className="w-full mt-8 mb-12">
       {/* Title above products */}
       <div className="mb-6">
-        <h2 className="font-cal font-bold text-3xl sm:text-4xl text-zinc-950 tracking-tight">
+        <GsapTextReveal
+          as="h2"
+          className="font-cal font-bold text-3xl sm:text-4xl text-zinc-950 tracking-tight"
+          scrollTrigger={false}
+          stagger={0.06}
+          duration={0.75}
+          rotate={true}
+        >
           Products
-        </h2>
+        </GsapTextReveal>
       </div>
 
       {/* Top Bar matching Channel3 demo: View All & Directional Controls */}
@@ -91,10 +99,16 @@ export default function ProductResultsSection({
 
       {/* Channel3 Conversational Response & Follow-up Prompt Chips */}
       <div className="mt-8 text-center space-y-3.5 max-w-2xl mx-auto">
-        <p className="font-cal text-xs sm:text-sm text-slate-700 leading-relaxed">
-          I found {recommendations.length} live {intent?.category || ""} options
-          {intent?.searchQuery ? ` for "${intent.searchQuery}"` : ""}. Hover any card to inspect merchant stock stack and lock with PayPal:
-        </p>
+        <GsapTextReveal
+          as="p"
+          className="font-cal text-xs sm:text-sm text-slate-700 leading-relaxed"
+          scrollTrigger={false}
+          stagger={0.018}
+          duration={0.6}
+          y="100%"
+        >
+          {`I found ${recommendations.length} live ${intent?.category || ""} options${intent?.searchQuery ? ` for "${intent.searchQuery}"` : ""}. Hover any card to inspect merchant stock stack and lock with PayPal:`}
+        </GsapTextReveal>
 
         <div className="flex flex-wrap items-center justify-center gap-2">
           {[

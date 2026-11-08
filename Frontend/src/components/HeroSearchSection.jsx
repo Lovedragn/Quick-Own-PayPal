@@ -2,6 +2,7 @@
 
 import { AlertCircle } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
+import GsapTextReveal from "@/components/ui/GsapTextReveal";
 
 export default function HeroSearchSection({
   query,
@@ -22,17 +23,33 @@ export default function HeroSearchSection({
 
       <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 flex flex-col justify-center items-center">
         <div className="hero-inner w-full py-8 text-center">
-          <h1 className="font-cal font-bold text-4xl sm:text-6xl lg:text-[64px] leading-[1.08] tracking-tight text-[#17270C] mb-4">
+          <GsapTextReveal
+            as="h1"
+            className="font-cal font-bold text-4xl sm:text-6xl lg:text-[64px] leading-[1.08] tracking-tight text-[#17270C] mb-4"
+            scrollTrigger={false}
+            delay={0.1}
+            stagger={0.1}
+            duration={0.85}
+            rotate={true}
+          >
             Search less. Save more. <br />
             <span className="text-[#245A19]">
               Instant checkout with PayPal.
             </span>
-          </h1>
+          </GsapTextReveal>
 
-          <p className="mt-5 text-base sm:text-lg text-[#4A5A3F] max-w-[50ch] mx-auto text-balance font-normal leading-relaxed">
+          <GsapTextReveal
+            as="p"
+            className="mt-5 text-base sm:text-lg text-[#4A5A3F] max-w-[50ch] mx-auto text-balance font-normal leading-relaxed"
+            scrollTrigger={false}
+            delay={0.2}
+            stagger={0.05}
+            duration={0.65}
+            y="100%"
+          >
             AI compares live prices across verified stores, locking the best
             deal for instant PayPal checkout.
-          </p>
+          </GsapTextReveal>
 
           {/* Channel3-Style Hero Search Bar */}
           <SearchBar

@@ -43,7 +43,10 @@ import {
   createStoredLikedProduct,
 } from "@/lib/storage";
 import { extractNormalizedOffers } from "@/lib/variants";
+
+import GsapTextReveal from "@/components/ui/GsapTextReveal";
 import { useSavedProductHydration } from "@/lib/useSavedProductHydration";
+
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -1102,13 +1105,29 @@ Apply these preferences only when compatible with the current request. Explicit 
               <div className="w-12 h-12 rounded-full bg-zinc-50 border border-zinc-200 flex items-center justify-center mx-auto mb-4 text-zinc-700">
                 <Sparkles className="w-6 h-6" />
               </div>
-              <h2 className="font-cal font-bold text-2xl sm:text-3xl text-zinc-950 mb-3">
+              <GsapTextReveal
+                as="h2"
+                className="font-cal font-bold text-2xl sm:text-3xl text-zinc-950 mb-3"
+                scrollTrigger={false}
+                delay={0.1}
+                stagger={0.05}
+                duration={0.8}
+                rotate={true}
+              >
                 Start a New Shopping Conversation
-              </h2>
-              <p className="text-sm sm:text-base text-zinc-600 max-w-md mx-auto mb-8 leading-relaxed">
+              </GsapTextReveal>
+              <GsapTextReveal
+                as="p"
+                className="text-sm sm:text-base text-zinc-600 max-w-md mx-auto mb-8 leading-relaxed"
+                scrollTrigger={false}
+                delay={0.25}
+                stagger={0.02}
+                duration={0.6}
+                y="100%"
+              >
                 Type what you are hunting for in the search bar above or choose
                 a popular suggestion to begin:
-              </p>
+              </GsapTextReveal>
 
               <div className="flex flex-wrap items-center justify-center gap-2">
                 {POPULAR_SUGGESTIONS.map((item) => (

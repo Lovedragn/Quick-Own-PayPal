@@ -8,6 +8,7 @@ import { Mail, LockKeyhole, ArrowRight, ShieldCheck } from "lucide-react";
 
 import GoogleAuthButton from "@/components/auth/GoogleAuthButton";
 import AuthInput from "@/components/auth/AuthInput";
+import GsapTextReveal from "@/components/ui/GsapTextReveal";
 import "../auth.css";
 
 const API_BASE =
@@ -82,16 +83,32 @@ export default function SignupPage() {
             </div>
 
             <h1>
-              Own more.
-              <br />
-              <span>Spend less.</span>
+              <GsapTextReveal
+                as="span"
+                scrollTrigger={false}
+                delay={0.1}
+                stagger={0.06}
+                duration={0.8}
+                rotate={true}
+              >
+                Own more.
+                <br />
+                <span>Spend less.</span>
+              </GsapTextReveal>
             </h1>
 
-            <p>
+            <GsapTextReveal
+              as="p"
+              scrollTrigger={false}
+              delay={0.3}
+              stagger={0.02}
+              duration={0.6}
+              y="100%"
+            >
               Discover a smarter way to shop.
               Get the products you need without
               paying more than you should.
-            </p>
+            </GsapTextReveal>
 
             <div className="visual-features">
               <div>
@@ -129,10 +146,26 @@ export default function SignupPage() {
 
             <div className="auth-heading">
               <span className="auth-eyebrow">GET STARTED</span>
-              <h2>Create your account</h2>
-              <p>
+              <GsapTextReveal
+                as="h2"
+                scrollTrigger={false}
+                delay={0.2}
+                stagger={0.05}
+                duration={0.75}
+                rotate={true}
+              >
+                Create your account
+              </GsapTextReveal>
+              <GsapTextReveal
+                as="p"
+                scrollTrigger={false}
+                delay={0.35}
+                stagger={0.02}
+                duration={0.6}
+                y="100%"
+              >
                 Join QuickOwn and start shopping smarter.
-              </p>
+              </GsapTextReveal>
             </div>
 
             <GoogleAuthButton />
