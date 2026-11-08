@@ -16,9 +16,12 @@ import LikesDrawer from "@/components/LikesDrawer";
 import OrdersDrawer from "@/components/OrdersDrawer";
 import ProductDetailOverlay from "@/components/ProductDetailOverlay";
 import ProductSkeletonGrid from "@/components/ProductSkeletonGrid";
+<<<<<<< HEAD
+=======
 import ChatHistoryDrawer from "@/components/ChatHistoryDrawer";
 import MemoryManagerDrawer from "@/components/MemoryManagerDrawer";
 import { Spinner } from "@/components/ui/spinner";
+>>>>>>> e8c6800cafa3aa82fdf76e0a39da397ad39943d4
 import IconButton from "@/components/ui/icon-button";
 import {
   AlertCircle,
@@ -401,12 +404,21 @@ function ProductsView() {
     }
   }
 
+  // Always ensure page is open and visible on mount or when route changes
+  useEffect(() => {
+    setIsClosing(false);
+    return () => {
+      setIsClosing(false);
+    };
+  }, [searchParams]);
+
   // Close handler with slide down animation
   const handleClose = useCallback(() => {
     setIsClosing(true);
     setTimeout(() => {
       saveActiveConversationId(null);
       router.push("/");
+      setIsClosing(false);
     }, 280);
   }, [router, saveActiveConversationId]);
 
@@ -957,9 +969,19 @@ Apply these preferences only when compatible with the current request. Explicit 
           +
         </div>
 
-        {/* Top Header Bar: Top Left New Conversation Button + Centered Search Bar + Top Right X Close Button */}
+        {/* Top Header Bar: Top Left X Close Button + Centered Search Bar + Top Right New Conversation Button */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-zinc-200 py-3.5 px-4 sm:px-6 shadow-[0_4px_20px_-8px_rgba(0,0,0,0.05)]">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4">
+<<<<<<< HEAD
+            {/* Top Left: X Close Button */}
+            <IconButton
+              icon={X}
+              onClick={handleClose}
+              ariaLabel="Close products and return to home"
+              title="Close (ESC)"
+              rounded="none"
+             />
+=======
             {/* Chat and memory controls */}
             <div className="flex items-center gap-1.5 shrink-0">
               <button
@@ -1005,6 +1027,7 @@ Apply these preferences only when compatible with the current request. Explicit 
                 )}
               </button>
             </div>
+>>>>>>> e8c6800cafa3aa82fdf76e0a39da397ad39943d4
 
             {/* Search Bar matching exact style */}
             <div className="flex-1 max-w-3xl mx-auto">
@@ -1025,14 +1048,17 @@ Apply these preferences only when compatible with the current request. Explicit 
               />
             </div>
 
-            {/* Top Right X Button */}
-            <IconButton
-              icon={X}
-              onClick={handleClose}
-              ariaLabel="Close products and return to home"
-              title="Close (ESC)"
-              rounded="none"
-             />
+            {/* Top Right: New Button */}
+            <button
+              type="button"
+              onClick={handleNewConversation}
+              title="Start a new conversation for products"
+              aria-label="New"
+              className="flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all shadow-2xs flex-shrink-0 cursor-pointer active:scale-95"
+            >
+              <MessageSquarePlus className="w-4 h-4 text-zinc-600" />
+              <span>New</span>
+            </button>
           </div>
         </header>
 
@@ -1095,6 +1121,7 @@ Apply these preferences only when compatible with the current request. Explicit 
                   setDetailProduct(rec);
                   setDetailVariantIndex(swatchIdx || 0);
                 }}
+                onNewConversation={handleNewConversation}
               />
             </div>
           )}
@@ -1107,7 +1134,7 @@ Apply these preferences only when compatible with the current request. Explicit 
               </div>
               <GsapTextReveal
                 as="h2"
-                className="font-cal font-bold text-2xl sm:text-3xl text-zinc-950 mb-3"
+                className="font-cal font-bold text-2xl sm:text-3xl text-zinc-950 mb-6 sm:mb-8"
                 scrollTrigger={false}
                 delay={0.1}
                 stagger={0.05}
@@ -1115,18 +1142,6 @@ Apply these preferences only when compatible with the current request. Explicit 
                 rotate={true}
               >
                 Start a New Shopping Conversation
-              </GsapTextReveal>
-              <GsapTextReveal
-                as="p"
-                className="text-sm sm:text-base text-zinc-600 max-w-md mx-auto mb-8 leading-relaxed"
-                scrollTrigger={false}
-                delay={0.25}
-                stagger={0.02}
-                duration={0.6}
-                y="100%"
-              >
-                Type what you are hunting for in the search bar above or choose
-                a popular suggestion to begin:
               </GsapTextReveal>
 
               <div className="flex flex-wrap items-center justify-center gap-2">
