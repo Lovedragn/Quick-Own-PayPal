@@ -66,19 +66,19 @@ const evolutionChartConfig = {
 };
 
 export default function ProductShowcaseSection() {
-  const [chartKey, setChartKey] = useState(0);
+  const [isChartInView, setIsChartInView] = useState(false);
   const chartSectionRef = useRef(null);
 
   useEffect(() => {
     // GSAP Context ensures reliable cleanup on React remounts
     const ctx = gsap.context(() => {
-      // 1. ScrollTrigger to trigger the Recharts line animation remount ONLY at 50%
+      // 1. ScrollTrigger to mount and animate chart once when it enters viewport
       ScrollTrigger.create({
         trigger: ".chart-box",
-        start: "top 70%",
+        start: "top 85%",
         once: true,
         onEnter: () => {
-          setChartKey((prev) => prev + 1);
+          setIsChartInView(true);
         },
       });
 
@@ -205,11 +205,11 @@ export default function ProductShowcaseSection() {
         0.1,
       );
 
-      // 4. Animate the Chart Container box ONLY at 50%
+      // 4. Animate the Chart Container box
       gsap.from(".chart-box", {
         scrollTrigger: {
           trigger: ".chart-box",
-          start: "top 100%",
+          start: "top 85%",
           once: true,
         },
         y: 32,
@@ -326,15 +326,15 @@ export default function ProductShowcaseSection() {
           <div className="p-6 sm:p-8">
             {/* Shadcn Line Chart Container */}
             <div className="chart-box w-full h-[380px] sm:h-[420px]">
-              <ChartContainer
-                config={evolutionChartConfig}
-                className="h-[380px] sm:h-[420px] w-full"
-              >
-                <LineChart
-                  key={chartKey}
-                  data={SHOPPING_EVOLUTION_DATA}
-                  margin={{ top: 20, right: 24, left: 24, bottom: 10 }}
+              {isChartInView && (
+                <ChartContainer
+                  config={evolutionChartConfig}
+                  className="h-[380px] sm:h-[420px] w-full"
                 >
+                  <LineChart
+                    data={SHOPPING_EVOLUTION_DATA}
+                    margin={{ top: 20, right: 24, left: 24, bottom: 10 }}
+                  >
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
@@ -423,6 +423,7 @@ export default function ProductShowcaseSection() {
                   />
                 </LineChart>
               </ChartContainer>
+              )}
             </div>
           </div>
         </div>

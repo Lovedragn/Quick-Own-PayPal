@@ -43,13 +43,22 @@ import {
   createStoredLikedProduct,
 } from "@/lib/storage";
 import { extractNormalizedOffers } from "@/lib/variants";
+import { useAuth } from "@/lib/useAuth";
+import {
+  fetchRemoteConversations,
+  saveRemoteConversation,
+  saveRemoteTurn,
+  deleteRemoteConversation,
+  clearRemoteConversations,
+} from "@/lib/supabase";
 
 import GsapTextReveal from "@/components/ui/GsapTextReveal";
 import { useSavedProductHydration } from "@/lib/useSavedProductHydration";
 
-
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.API_BASE_URL ||
+  "http://localhost:8080";
 
 const POPULAR_SUGGESTIONS = [
   "Sony WH-1000XM5 Headphones",
@@ -135,6 +144,7 @@ function ProductsView() {
   const lastExecutedKeyRef = useRef("");
 
   // User Preferences State with Local Storage
+  const { user } = useAuth();
   const [cart, saveCart] = useCartPreference();
   const [likedIds, saveLikes] = useLikesPreference();
   const [likedProductDetails, saveLikedProductDetails] =
@@ -149,6 +159,20 @@ function ProductsView() {
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
+
+  // Sync Supabase conversations when user logs in
+  useEffect(() => {
+    if (!user?.id) return;
+    let isMounted = true;
+    fetchRemoteConversations(user.id).then((remoteConvs) => {
+      if (isMounted && remoteConvs && remoteConvs.length > 0) {
+        saveConversations(remoteConvs);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, saveConversations]);
 
   useSavedProductHydration({
     likedIds,
@@ -170,8 +194,11 @@ function ProductsView() {
     };
     saveConversations([conversation, ...conversations].slice(0, 20));
     saveActiveConversationId(conversation.id);
+    if (user?.id) {
+      saveRemoteConversation(conversation, user.id);
+    }
     return conversation.id;
-  }, [conversations, saveConversations, saveActiveConversationId]);
+  }, [conversations, saveConversations, saveActiveConversationId, user?.id]);
 
   const persistConversationTurn = useCallback(
     (turnData) => {
@@ -259,12 +286,16 @@ function ProductsView() {
       if (conversationId !== activeConversationId) {
         saveActiveConversationId(conversationId);
       }
+      if (user?.id) {
+        saveRemoteTurn(turn, conversationId, user.id);
+      }
     },
     [
       activeConversationId,
       conversations,
       saveActiveConversationId,
       saveConversations,
+      user?.id,
     ],
   );
 
@@ -309,19 +340,28 @@ function ProductsView() {
   }
 
   function handleRenameConversation(conversationId, title) {
-    saveConversations(
-      conversations.map((conversation) =>
-        conversation.id === conversationId
-          ? { ...conversation, title: title.slice(0, 64) }
-          : conversation,
-      ),
+    const cleanTitle = title.slice(0, 64);
+    const updated = conversations.map((conversation) =>
+      conversation.id === conversationId
+        ? { ...conversation, title: cleanTitle, updatedAt: new Date().toISOString() }
+        : conversation,
     );
+    saveConversations(updated);
+    if (user?.id) {
+      const match = updated.find((c) => c.id === conversationId);
+      if (match) saveRemoteConversation(match, user.id);
+    }
   }
 
   function handleDeleteConversation(conversationId) {
     saveConversations(
-      conversations.filter((conversation) => conversation.id !== conversationId),
+      conversations.filter(
+        (conversation) => conversation.id !== conversationId,
+      ),
     );
+    if (user?.id) {
+      deleteRemoteConversation(conversationId, user.id);
+    }
     if (activeConversationId === conversationId) {
       saveActiveConversationId(null);
       setQuery("");
@@ -346,10 +386,15 @@ function ProductsView() {
     setSearchComplete(false);
     lastExecutedKeyRef.current = "::noimg";
     router.replace("/products", { scroll: false });
+    if (user?.id) {
+      clearRemoteConversations(user.id);
+    }
   }
 
   function handleOpenConversation(conversationId, turnId) {
-    const conversation = conversations.find((item) => item.id === conversationId);
+    const conversation = conversations.find(
+      (item) => item.id === conversationId,
+    );
     if (!conversation) return;
     const turns = Array.isArray(conversation.turns) ? conversation.turns : [];
     const latestTurn =
@@ -368,8 +413,10 @@ function ProductsView() {
       setIntent(latestTurn.intent || null);
       setNotice(latestTurn.notice || "");
       setError(latestTurn.error || "");
-      setSearchComplete(latestTurn.status !== "error" ||
-        (latestTurn.recommendations || []).length > 0);
+      setSearchComplete(
+        latestTurn.status !== "error" ||
+          (latestTurn.recommendations || []).length > 0,
+      );
       const restoredOffers = {};
       (latestTurn.recommendations || []).forEach((recommendation) => {
         const productId = recommendation.product?.productId;
@@ -840,8 +887,12 @@ Apply these preferences only when compatible with the current request. Explicit 
               category: product.category,
               description: product.description,
               imageUrl: product.imageUrl,
-              offers: Array.isArray(product.offers) ? product.offers.slice(0, 8) : [],
-              images: Array.isArray(product.images) ? product.images.slice(0, 6) : [],
+              offers: Array.isArray(product.offers)
+                ? product.offers.slice(0, 8)
+                : [],
+              images: Array.isArray(product.images)
+                ? product.images.slice(0, 6)
+                : [],
               inStock: product.inStock,
             },
             merchant: offer.merchant,
@@ -994,7 +1045,9 @@ Apply these preferences only when compatible with the current request. Explicit 
                 <History className="w-4 h-4" />
                 <span className="hidden lg:inline">History</span>
                 {conversations.length > 0 && (
-                  <span className="text-[10px] font-bold text-emerald-700">{conversations.length}</span>
+                  <span className="text-[10px] font-bold text-emerald-700">
+                    {conversations.length}
+                  </span>
                 )}
               </button>
               <button
@@ -1010,7 +1063,9 @@ Apply these preferences only when compatible with the current request. Explicit 
                 <Brain className="w-4 h-4" />
                 <span className="hidden lg:inline">Memory</span>
                 {memories.length > 0 && (
-                  <span className="text-[10px] font-bold text-emerald-700">{memories.length}</span>
+                  <span className="text-[10px] font-bold text-emerald-700">
+                    {memories.length}
+                  </span>
                 )}
               </button>
             </div>
