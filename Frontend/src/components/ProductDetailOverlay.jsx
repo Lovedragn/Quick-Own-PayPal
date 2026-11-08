@@ -620,7 +620,7 @@ export default function ProductDetailOverlay({
                 className="w-10 h-10 [&_svg]:w-4.5 [&_svg]:h-4.5"
                 onClick={() => {
                   if (onToggleLike && product?.productId) {
-                    onToggleLike(product.productId);
+                    onToggleLike(product.productId, recommendation);
                   }
                 }}
                 ariaLabel="Add to wishlist"

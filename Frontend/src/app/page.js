@@ -14,10 +14,17 @@ import ProductDetailOverlay from "@/components/ProductDetailOverlay";
 import {
   useCartPreference,
   useLikesPreference,
+  useLikedProductDetailsPreference,
   useQuantitiesPreference,
   useOrdersPreference,
+  useConversationsPreference,
 } from "@/lib/usePreferences";
-import { saveStoredPendingCheckout } from "@/lib/storage";
+import {
+  saveStoredPendingCheckout,
+  saveStoredActiveConversationId,
+  createStoredLikedProduct,
+} from "@/lib/storage";
+import { useSavedProductHydration } from "@/lib/useSavedProductHydration";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -54,10 +61,22 @@ export default function Home() {
   // User Preferences State with Local Storage
   const [cart, saveCart] = useCartPreference();
   const [likedIds, saveLikes] = useLikesPreference();
+  const [likedProductDetails, saveLikedProductDetails] =
+    useLikedProductDetailsPreference();
   const [orders, saveOrders] = useOrdersPreference();
+  const [conversations] = useConversationsPreference();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLikesOpen, setIsLikesOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
+
+  useSavedProductHydration({
+    likedIds,
+    likedProductDetails,
+    saveLikedProductDetails,
+    orders,
+    saveOrders,
+    conversations,
+  });
 
   // Add Item to Cart
   function handleAddToCart(recommendation, offer, quantity = 1) {
@@ -120,16 +139,26 @@ export default function Home() {
     });
   }
 
-  // Toggle Liked Product
-  function handleToggleLike(productId) {
+  // Keep product details beside the ID so wishlist names survive navigation and refresh.
+  function handleToggleLike(productId, recommendation) {
     if (!productId) return;
-    let nextLikes;
+
     if (likedIds.includes(productId)) {
-      nextLikes = likedIds.filter((id) => id !== productId);
-    } else {
-      nextLikes = [...likedIds, productId];
+      saveLikes(likedIds.filter((id) => id !== productId));
+      const nextDetails = { ...likedProductDetails };
+      delete nextDetails[productId];
+      saveLikedProductDetails(nextDetails);
+      return;
     }
-    saveLikes(nextLikes);
+
+    saveLikes([...likedIds, productId]);
+    const savedProduct = createStoredLikedProduct(recommendation);
+    if (savedProduct) {
+      saveLikedProductDetails({
+        ...likedProductDetails,
+        [productId]: savedProduct,
+      });
+    }
   }
 
   const cartTotalAmount = useMemo(() => {
@@ -155,6 +184,7 @@ export default function Home() {
       }
     }
 
+    saveStoredActiveConversationId(null);
     const targetUrl = searchQuery
       ? `/products?q=${encodeURIComponent(searchQuery)}`
       : `/products`;
@@ -173,6 +203,7 @@ export default function Home() {
       } catch (e) {
         console.warn("Could not save image to sessionStorage", e);
       }
+      saveStoredActiveConversationId(null);
       const targetUrl = query.trim()
         ? `/products?q=${encodeURIComponent(query.trim())}`
         : `/products`;
@@ -220,7 +251,11 @@ export default function Home() {
     try {
       const items = cart.map((item) => ({
         productId: item.productId,
-        productName: item.productName,
+        productName:
+          item.productName ||
+          item.recommendation?.product?.name ||
+          item.name ||
+          "Unnamed product",
         merchantDomain: item.merchant,
         quantity: item.quantity,
         offerUrl: item.offerUrl,
@@ -249,8 +284,26 @@ export default function Home() {
         orderId: order.orderId,
         items: cart.map((item) => ({
           productId: item.productId,
-          name: item.name,
+          name:
+            item.productName ||
+            item.recommendation?.product?.name ||
+            item.name ||
+            "Unnamed product",
+          productName:
+            item.productName ||
+            item.recommendation?.product?.name ||
+            item.name ||
+            "Unnamed product",
           imageUrl: item.imageUrl,
+          brand: item.brand || item.recommendation?.product?.brand,
+          description: item.recommendation?.product?.description,
+          category: item.recommendation?.product?.category,
+          product: item.recommendation?.product || {
+            productId: item.productId,
+            name: item.productName || item.name || "Unnamed product",
+            brand: item.brand,
+            imageUrl: item.imageUrl,
+          },
           merchant: item.merchant,
           price: item.price,
           currency: item.currency,
@@ -337,6 +390,7 @@ export default function Home() {
         isOpen={isLikesOpen}
         onClose={() => setIsLikesOpen(false)}
         likedIds={likedIds}
+        likedProductDetails={likedProductDetails}
         recommendations={[]}
         onToggleLike={handleToggleLike}
         onOpenDetail={(rec, swatchIdx) => {
