@@ -3,6 +3,7 @@
 const STORAGE_KEYS = {
   CART: "quickown_cart",
   LIKES: "quickown_liked_products",
+  LIKED_PRODUCT_DETAILS: "quickown_liked_product_details",
   PAGINATION: "quickown_pagination",
   QUANTITIES: "quickown_quantities",
   ORDERS: "quickown_orders",
@@ -52,6 +53,61 @@ export function saveStoredLikedProducts(likedIds) {
   } catch (e) {
     console.error("Failed to save likes to local storage", e);
   }
+}
+
+export function getStoredLikedProductDetails() {
+  const details = getStoredJson(STORAGE_KEYS.LIKED_PRODUCT_DETAILS, {});
+  return details && typeof details === "object" && !Array.isArray(details)
+    ? details
+    : {};
+}
+
+export function saveStoredLikedProductDetails(details) {
+  const safeDetails =
+    details && typeof details === "object" && !Array.isArray(details)
+      ? details
+      : {};
+  saveStoredJson(
+    STORAGE_KEYS.LIKED_PRODUCT_DETAILS,
+    safeDetails,
+    "quickown_liked_product_details_updated",
+  );
+}
+
+export function createStoredLikedProduct(recommendation) {
+  const product = recommendation?.product;
+  if (!product?.productId) return null;
+
+  const safeImageUrl = (value) =>
+    typeof value === "string" && !value.trim().startsWith("data:")
+      ? value
+      : null;
+
+  return {
+    product: {
+      source: product.source || null,
+      productId: product.productId,
+      name: product.name || "Unnamed product",
+      brand: product.brand || null,
+      category: product.category || null,
+      description: product.description || null,
+      imageUrl: safeImageUrl(product.imageUrl),
+      inStock: product.inStock,
+      offers: Array.isArray(product.offers) ? product.offers.slice(0, 8) : [],
+      variants: product.variants || null,
+      images: Array.isArray(product.images)
+        ? product.images.slice(0, 6).filter((image) =>
+            typeof image === "string" ? safeImageUrl(image) : image,
+          )
+        : [],
+    },
+    selectedOffer: recommendation.selectedOffer || null,
+    matchedFeatureCount: recommendation.matchedFeatureCount || 0,
+    matchedFeatures: Array.isArray(recommendation.matchedFeatures)
+      ? recommendation.matchedFeatures.slice(0, 10)
+      : [],
+    explanation: recommendation.explanation || "",
+  };
 }
 
 export function getStoredPagination() {

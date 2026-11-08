@@ -141,7 +141,7 @@ export default function OrdersDrawer({
 
                         <div className="flex-1 min-w-0">
                           <h4 className="text-xs font-semibold text-slate-900 truncate">
-                            {item.name || item.productName || "Unnamed product"}
+                            {item.name || item.productName || item.product?.name || (item.productId ? `Product #${item.productId}` : "Unnamed product")}
                           </h4>
                           <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
                             <span>Qty: {item.quantity || 1}</span>

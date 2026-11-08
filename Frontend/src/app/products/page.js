@@ -33,11 +33,15 @@ import {
   useLikesPreference,
   useQuantitiesPreference,
   useOrdersPreference,
+  useLikedProductDetailsPreference,
   useConversationsPreference,
   useActiveConversationPreference,
   useMemoriesPreference,
 } from "@/lib/usePreferences";
-import { saveStoredPendingCheckout } from "@/lib/storage";
+import {
+  saveStoredPendingCheckout,
+  createStoredLikedProduct,
+} from "@/lib/storage";
 import { extractNormalizedOffers } from "@/lib/variants";
 
 const API_BASE =
@@ -129,6 +133,8 @@ function ProductsView() {
   // User Preferences State with Local Storage
   const [cart, saveCart] = useCartPreference();
   const [likedIds, saveLikes] = useLikesPreference();
+  const [likedProductDetails, saveLikedProductDetails] =
+    useLikedProductDetailsPreference();
   const [orders, saveOrders] = useOrdersPreference();
   const [conversations, saveConversations] = useConversationsPreference();
   const [activeConversationId, saveActiveConversationId] =
@@ -523,15 +529,28 @@ function ProductsView() {
   }
 
   // Toggle Liked Product
-  function handleToggleLike(productId) {
+  function handleToggleLike(productId, recommendation) {
     if (!productId) return;
-    let nextLikes;
+
     if (likedIds.includes(productId)) {
-      nextLikes = likedIds.filter((id) => id !== productId);
-    } else {
-      nextLikes = [...likedIds, productId];
+      saveLikes(likedIds.filter((id) => id !== productId));
+      const nextDetails = { ...likedProductDetails };
+      delete nextDetails[productId];
+      saveLikedProductDetails(nextDetails);
+      return;
     }
-    saveLikes(nextLikes);
+
+    saveLikes([...likedIds, productId]);
+    const sourceRecommendation =
+      recommendation ||
+      recommendations.find((item) => item.product?.productId === productId);
+    const savedProduct = createStoredLikedProduct(sourceRecommendation);
+    if (savedProduct) {
+      saveLikedProductDetails({
+        ...likedProductDetails,
+        [productId]: savedProduct,
+      });
+    }
   }
 
   const cartTotalAmount = useMemo(() => {
@@ -848,8 +867,10 @@ Apply these preferences only when compatible with the current request. Explicit 
         orderId: order.orderId,
         items: cart.map((item) => ({
           productId: item.productId,
-          name: item.name,
+          name: item.productName || item.name || "Unnamed product",
+          productName: item.productName || item.name || "Unnamed product",
           imageUrl: item.imageUrl,
+          brand: item.brand,
           merchant: item.merchant,
           price: item.price,
           currency: item.currency,
@@ -1089,6 +1110,7 @@ Apply these preferences only when compatible with the current request. Explicit 
         isOpen={isLikesOpen}
         onClose={() => setIsLikesOpen(false)}
         likedIds={likedIds}
+        likedProductDetails={likedProductDetails}
         recommendations={recommendations}
         onToggleLike={handleToggleLike}
         onOpenDetail={(rec, swatchIdx) => {

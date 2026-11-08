@@ -4,6 +4,7 @@ import {
   saveStoredCart,
   getStoredLikedProducts,
   saveStoredLikedProducts,
+  saveStoredLikedProductDetails,
   getStoredPagination,
   saveStoredPagination,
   getStoredQuantities,
@@ -95,6 +96,30 @@ export function useLikesPreference() {
   }
 
   return [likes, saveStoredLikedProducts];
+}
+
+export function useLikedProductDetailsPreference() {
+  const detailsJson = useSyncExternalStore(
+    (callback) =>
+      subscribeLocalPreference("quickown_liked_product_details_updated", callback),
+    () =>
+      typeof window === "undefined"
+        ? "{}"
+        : localStorage.getItem("quickown_liked_product_details") || "{}",
+    () => "{}",
+  );
+
+  let details = {};
+  try {
+    const parsed = JSON.parse(detailsJson);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      details = parsed;
+    }
+  } catch {
+    details = {};
+  }
+
+  return [details, saveStoredLikedProductDetails];
 }
 
 let emptyQuantities = {};

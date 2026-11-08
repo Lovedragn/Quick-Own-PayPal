@@ -7,6 +7,7 @@ export default function LikesDrawer({
   isOpen,
   onClose,
   likedIds = [],
+  likedProductDetails = {},
   recommendations = [],
   onToggleLike,
   onOpenDetail,
@@ -50,10 +51,11 @@ export default function LikesDrawer({
             </div>
           ) : (
             likedIds.map((id) => {
-              const match = recommendations.find(
-                (r) => r.product?.productId === id
-              );
-              const product = match?.product;
+              const match =
+                recommendations.find((r) => r.product?.productId === id) ||
+                likedProductDetails[id] ||
+                null;
+              const product = match?.product || null;
               const imageUrl = product?.imageUrl;
 
               return (

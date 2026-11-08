@@ -14,12 +14,14 @@ import ProductDetailOverlay from "@/components/ProductDetailOverlay";
 import {
   useCartPreference,
   useLikesPreference,
+  useLikedProductDetailsPreference,
   useQuantitiesPreference,
   useOrdersPreference,
 } from "@/lib/usePreferences";
 import {
   saveStoredPendingCheckout,
   saveStoredActiveConversationId,
+  createStoredLikedProduct,
 } from "@/lib/storage";
 
 const API_BASE =
@@ -57,6 +59,8 @@ export default function Home() {
   // User Preferences State with Local Storage
   const [cart, saveCart] = useCartPreference();
   const [likedIds, saveLikes] = useLikesPreference();
+  const [likedProductDetails, saveLikedProductDetails] =
+    useLikedProductDetailsPreference();
   const [orders, saveOrders] = useOrdersPreference();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLikesOpen, setIsLikesOpen] = useState(false);
@@ -123,16 +127,26 @@ export default function Home() {
     });
   }
 
-  // Toggle Liked Product
-  function handleToggleLike(productId) {
+  // Keep product details beside the ID so wishlist names survive navigation and refresh.
+  function handleToggleLike(productId, recommendation) {
     if (!productId) return;
-    let nextLikes;
+
     if (likedIds.includes(productId)) {
-      nextLikes = likedIds.filter((id) => id !== productId);
-    } else {
-      nextLikes = [...likedIds, productId];
+      saveLikes(likedIds.filter((id) => id !== productId));
+      const nextDetails = { ...likedProductDetails };
+      delete nextDetails[productId];
+      saveLikedProductDetails(nextDetails);
+      return;
     }
-    saveLikes(nextLikes);
+
+    saveLikes([...likedIds, productId]);
+    const savedProduct = createStoredLikedProduct(recommendation);
+    if (savedProduct) {
+      saveLikedProductDetails({
+        ...likedProductDetails,
+        [productId]: savedProduct,
+      });
+    }
   }
 
   const cartTotalAmount = useMemo(() => {
@@ -254,8 +268,10 @@ export default function Home() {
         orderId: order.orderId,
         items: cart.map((item) => ({
           productId: item.productId,
-          name: item.name,
+          name: item.productName || item.name || "Unnamed product",
+          productName: item.productName || item.name || "Unnamed product",
           imageUrl: item.imageUrl,
+          brand: item.brand,
           merchant: item.merchant,
           price: item.price,
           currency: item.currency,
@@ -342,6 +358,7 @@ export default function Home() {
         isOpen={isLikesOpen}
         onClose={() => setIsLikesOpen(false)}
         likedIds={likedIds}
+        likedProductDetails={likedProductDetails}
         recommendations={[]}
         onToggleLike={handleToggleLike}
         onOpenDetail={(rec, swatchIdx) => {
