@@ -1,8 +1,14 @@
+
 "use client";
 
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, ShoppingCart, PackageCheck } from "lucide-react";
+import {
+  Heart,
+  ShoppingCart,
+  PackageCheck,
+  LogIn,
+} from "lucide-react";
 
 export default function HeaderNav({
   likedCount = 0,
@@ -15,6 +21,8 @@ export default function HeaderNav({
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-zinc-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[68px] flex items-center justify-between">
+
+        {/* Logo */}
         <Link href="/" className="inline-flex items-center gap-2.5 group">
           <div className="w-8 h-8 rounded-lg bg-[#0F172A] flex items-center justify-center transition-transform group-hover:scale-105 shadow-sm p-1.5">
             <Image
@@ -26,11 +34,13 @@ export default function HeaderNav({
               priority
             />
           </div>
+
           <span className="font-cal font-bold text-xl tracking-tight text-zinc-900">
             Quick<span className="text-[#16A34A] font-serif italic">Own</span>
           </span>
         </Link>
 
+        {/* Navigation */}
         <nav className="hidden md:flex items-center gap-7 text-xs font-cal font-semibold uppercase tracking-wider text-zinc-600">
           <Link
             href="/#product-features"
@@ -38,12 +48,14 @@ export default function HeaderNav({
           >
             Product
           </Link>
+
           <Link
             href="/#savings-speed"
             className="hover:text-zinc-950 transition-colors"
           >
             Savings & Speed
           </Link>
+
           <Link
             href="/#architecture"
             className="hover:text-zinc-950 transition-colors"
@@ -53,7 +65,26 @@ export default function HeaderNav({
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Wishlist / Liked Products Indicator */}
+
+          {/* Authentication Buttons */}
+          <div className="flex items-center gap-1 sm:gap-2 mr-1 sm:mr-2">
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-cal font-semibold text-zinc-700 hover:text-[#16A34A] hover:bg-zinc-100 transition-all"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Login</span>
+            </Link>
+
+            <Link
+              href="/signup"
+              className="inline-flex items-center justify-center px-3.5 sm:px-4 py-2 rounded-lg bg-[#16A34A] text-white text-xs font-cal font-semibold shadow-sm hover:bg-green-700 hover:shadow-md transition-all"
+            >
+              Sign Up
+            </Link>
+          </div>
+
+          {/* Wishlist */}
           <button
             type="button"
             onClick={onOpenLikes}
@@ -62,8 +93,13 @@ export default function HeaderNav({
             aria-label="View liked products"
           >
             <Heart
-              className={`w-5 h-5 ${likedCount > 0 ? "fill-rose-500 text-rose-500" : ""}`}
+              className={`w-5 h-5 ${
+                likedCount > 0
+                  ? "fill-rose-500 text-rose-500"
+                  : ""
+              }`}
             />
+
             {likedCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-rose-500 text-white font-cal text-[10px] flex items-center justify-center font-bold">
                 {likedCount}
@@ -71,7 +107,7 @@ export default function HeaderNav({
             )}
           </button>
 
-          {/* Cart Button */}
+          {/* Cart */}
           <button
             type="button"
             onClick={onOpenCart}
@@ -80,6 +116,7 @@ export default function HeaderNav({
             aria-label="View shopping cart"
           >
             <ShoppingCart className="w-5 h-5" />
+
             {cartCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#0070BA] text-white font-cal text-[10px] flex items-center justify-center font-bold">
                 {cartCount}
@@ -87,7 +124,7 @@ export default function HeaderNav({
             )}
           </button>
 
-          {/* Ordered Products Button */}
+          {/* Orders */}
           <button
             type="button"
             onClick={onOpenOrders}
@@ -96,12 +133,14 @@ export default function HeaderNav({
             aria-label="View ordered products"
           >
             <PackageCheck className="w-5 h-5" />
+
             {ordersCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#16A34A] text-white font-cal text-[10px] flex items-center justify-center font-bold">
                 {ordersCount}
               </span>
             )}
           </button>
+
         </div>
       </div>
     </header>
