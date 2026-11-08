@@ -16,12 +16,9 @@ import LikesDrawer from "@/components/LikesDrawer";
 import OrdersDrawer from "@/components/OrdersDrawer";
 import ProductDetailOverlay from "@/components/ProductDetailOverlay";
 import ProductSkeletonGrid from "@/components/ProductSkeletonGrid";
-<<<<<<< HEAD
-=======
 import ChatHistoryDrawer from "@/components/ChatHistoryDrawer";
 import MemoryManagerDrawer from "@/components/MemoryManagerDrawer";
 import { Spinner } from "@/components/ui/spinner";
->>>>>>> e8c6800cafa3aa82fdf76e0a39da397ad39943d4
 import IconButton from "@/components/ui/icon-button";
 import {
   AlertCircle,
@@ -969,19 +966,9 @@ Apply these preferences only when compatible with the current request. Explicit 
           +
         </div>
 
-        {/* Top Header Bar: Top Left X Close Button + Centered Search Bar + Top Right New Conversation Button */}
+        {/* Top Header Bar: Top Left Chat & Memory Controls + Centered Search Bar + Top Right X Close Button */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-zinc-200 py-3.5 px-4 sm:px-6 shadow-[0_4px_20px_-8px_rgba(0,0,0,0.05)]">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4">
-<<<<<<< HEAD
-            {/* Top Left: X Close Button */}
-            <IconButton
-              icon={X}
-              onClick={handleClose}
-              ariaLabel="Close products and return to home"
-              title="Close (ESC)"
-              rounded="none"
-             />
-=======
             {/* Chat and memory controls */}
             <div className="flex items-center gap-1.5 shrink-0">
               <button
@@ -1027,7 +1014,6 @@ Apply these preferences only when compatible with the current request. Explicit 
                 )}
               </button>
             </div>
->>>>>>> e8c6800cafa3aa82fdf76e0a39da397ad39943d4
 
             {/* Search Bar matching exact style */}
             <div className="flex-1 max-w-3xl mx-auto">
@@ -1048,17 +1034,14 @@ Apply these preferences only when compatible with the current request. Explicit 
               />
             </div>
 
-            {/* Top Right: New Button */}
-            <button
-              type="button"
-              onClick={handleNewConversation}
-              title="Start a new conversation for products"
-              aria-label="New"
-              className="flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all shadow-2xs flex-shrink-0 cursor-pointer active:scale-95"
-            >
-              <MessageSquarePlus className="w-4 h-4 text-zinc-600" />
-              <span>New</span>
-            </button>
+            {/* Top Right: X Close Button */}
+            <IconButton
+              icon={X}
+              onClick={handleClose}
+              ariaLabel="Close products and return to home"
+              title="Close (ESC)"
+              rounded="none"
+            />
           </div>
         </header>
 
