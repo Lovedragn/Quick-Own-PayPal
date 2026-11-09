@@ -13,7 +13,6 @@ import {
   saveStoredOrders,
   saveStoredConversations,
   saveStoredActiveConversationId,
-  saveStoredMemories,
 } from "@/lib/storage";
 
 function subscribeCart(callback) {
@@ -214,17 +213,4 @@ export function useActiveConversationPreference() {
     () => null,
   );
   return [conversationId, saveStoredActiveConversationId];
-}
-
-export function useMemoriesPreference() {
-  const memoriesJson = useSyncExternalStore(
-    (callback) =>
-      subscribeLocalPreference("quickown_memories_updated", callback),
-    () =>
-      typeof window === "undefined"
-        ? "[]"
-        : localStorage.getItem("quickown_shopping_memories") || "[]",
-    () => "[]",
-  );
-  return [parseStoredArray(memoriesJson), saveStoredMemories];
 }

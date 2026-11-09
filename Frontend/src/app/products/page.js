@@ -17,12 +17,10 @@ import OrdersDrawer from "@/components/OrdersDrawer";
 import ProductDetailOverlay from "@/components/ProductDetailOverlay";
 import ProductSkeletonGrid from "@/components/ProductSkeletonGrid";
 import ChatHistoryDrawer from "@/components/ChatHistoryDrawer";
-import MemoryManagerDrawer from "@/components/MemoryManagerDrawer";
 import { Spinner } from "@/components/ui/spinner";
 import IconButton from "@/components/ui/icon-button";
 import {
   AlertCircle,
-  Brain,
   History,
   MessageSquarePlus,
   Sparkles,
@@ -36,7 +34,6 @@ import {
   useLikedProductDetailsPreference,
   useConversationsPreference,
   useActiveConversationPreference,
-  useMemoriesPreference,
 } from "@/lib/usePreferences";
 import {
   saveStoredPendingCheckout,
@@ -47,13 +44,13 @@ import { useAuth } from "@/lib/useAuth";
 import {
   fetchRemoteConversations,
   saveRemoteConversation,
-  saveRemoteTurn,
   deleteRemoteConversation,
   clearRemoteConversations,
 } from "@/lib/supabase";
 
 import GsapTextReveal from "@/components/ui/GsapTextReveal";
 import { useSavedProductHydration } from "@/lib/useSavedProductHydration";
+import { useSupabaseUserData } from "@/lib/useSupabaseUserData";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -144,7 +141,9 @@ function ProductsView() {
   const lastExecutedKeyRef = useRef("");
 
   // User Preferences State with Local Storage
-  const { user } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
+  const userId = user?.id;
+  const accessToken = session?.access_token;
   const [cart, saveCart] = useCartPreference();
   const [likedIds, saveLikes] = useLikesPreference();
   const [likedProductDetails, saveLikedProductDetails] =
@@ -153,12 +152,20 @@ function ProductsView() {
   const [conversations, saveConversations] = useConversationsPreference();
   const [activeConversationId, saveActiveConversationId] =
     useActiveConversationPreference();
-  const [memories, saveMemories] = useMemoriesPreference();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLikesOpen, setIsLikesOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isMemoryOpen, setIsMemoryOpen] = useState(false);
+
+  useSupabaseUserData({
+    userId,
+    likedIds,
+    saveLikes,
+    likedProductDetails,
+    saveLikedProductDetails,
+    orders,
+    saveOrders,
+  });
 
   // Sync Supabase conversations when user logs in
   useEffect(() => {
@@ -194,20 +201,20 @@ function ProductsView() {
     };
     saveConversations([conversation, ...conversations].slice(0, 20));
     saveActiveConversationId(conversation.id);
-    if (user?.id) {
-      saveRemoteConversation(conversation, user.id);
+    if (userId) {
+      saveRemoteConversation(conversation, userId);
     }
     return conversation.id;
-  }, [conversations, saveConversations, saveActiveConversationId, user?.id]);
+  }, [conversations, saveConversations, saveActiveConversationId, userId]);
 
   const persistConversationTurn = useCallback(
-    (turnData) => {
+    (turnData, conversationIdOverride, channel3ConversationId) => {
       const now = new Date().toISOString();
-      let conversationId = activeConversationId;
+      let conversationId = conversationIdOverride || activeConversationId;
       let current = conversations.find((item) => item.id === conversationId);
 
       if (!current) {
-        conversationId = createConversationId();
+        conversationId = conversationId || createConversationId();
         current = {
           id: conversationId,
           title: "New conversation",
@@ -215,7 +222,6 @@ function ProductsView() {
           updatedAt: now,
           turns: [],
         };
-        saveActiveConversationId(conversationId);
       }
 
       const recommendations = (turnData.recommendations || [])
@@ -256,6 +262,7 @@ function ProductsView() {
         createdAt: now,
         resultCount: recommendations.length,
         recommendations,
+        assistantMessage: turnData.assistantMessage || "",
         intent: turnData.intent || null,
         notice: turnData.notice || "",
         error: turnData.error || "",
@@ -270,6 +277,8 @@ function ProductsView() {
         ...current,
         title,
         updatedAt: now,
+        channel3ConversationId:
+          channel3ConversationId || current.channel3ConversationId || null,
         turns,
       };
       const next = [
@@ -286,58 +295,14 @@ function ProductsView() {
       if (conversationId !== activeConversationId) {
         saveActiveConversationId(conversationId);
       }
-      if (user?.id) {
-        saveRemoteTurn(turn, conversationId, user.id);
-      }
     },
     [
       activeConversationId,
       conversations,
       saveActiveConversationId,
       saveConversations,
-      user?.id,
     ],
   );
-
-  function handleAddMemory(content) {
-    const normalized = content.trim();
-    if (!normalized || memories.length >= 20) return;
-    if (
-      memories.some(
-        (memory) =>
-          memory.content?.trim().toLowerCase() === normalized.toLowerCase(),
-      )
-    ) {
-      return;
-    }
-    saveMemories([
-      {
-        id: createConversationId(),
-        content: normalized.slice(0, 240),
-        enabled: true,
-        createdAt: new Date().toISOString(),
-      },
-      ...memories,
-    ]);
-  }
-
-  function handleToggleMemory(memoryId) {
-    saveMemories(
-      memories.map((memory) =>
-        memory.id === memoryId
-          ? { ...memory, enabled: memory.enabled === false }
-          : memory,
-      ),
-    );
-  }
-
-  function handleDeleteMemory(memoryId) {
-    saveMemories(memories.filter((memory) => memory.id !== memoryId));
-  }
-
-  function handleClearMemories() {
-    saveMemories([]);
-  }
 
   function handleRenameConversation(conversationId, title) {
     const cleanTitle = title.slice(0, 64);
@@ -448,14 +413,6 @@ function ProductsView() {
     }
   }
 
-  // Always ensure page is open and visible on mount or when route changes
-  useEffect(() => {
-    setIsClosing(false);
-    return () => {
-      setIsClosing(false);
-    };
-  }, [searchParams]);
-
   // Close handler with slide down animation
   const handleClose = useCallback(() => {
     setIsClosing(true);
@@ -518,8 +475,7 @@ function ProductsView() {
         !isCartOpen &&
         !isLikesOpen &&
         !isOrdersOpen &&
-        !isHistoryOpen &&
-        !isMemoryOpen
+        !isHistoryOpen
       ) {
         handleClose();
       }
@@ -533,7 +489,6 @@ function ProductsView() {
     isLikesOpen,
     isOrdersOpen,
     isHistoryOpen,
-    isMemoryOpen,
   ]);
 
   // Add Item to Cart
@@ -629,29 +584,37 @@ function ProductsView() {
     );
   }, [cart]);
 
-  // Main search function
+  // Main search function. The server restores the Channel3 thread from Supabase.
   const executeSearch = useCallback(
     async (textQuery, imageSource) => {
       const activeText = (textQuery !== undefined ? textQuery : query).trim();
       const activeImage =
         imageSource !== undefined ? imageSource : uploadedImagePreview;
 
-      if (!activeText && !activeImage) {
+      if (!activeText && !activeImage) return;
+      if (authLoading) {
+        setError("Your account is still loading. Please try the search again.");
         return;
       }
 
-      const enabledMemories = memories
-        .filter((memory) => memory.enabled !== false && memory.content?.trim())
-        .slice(0, 10);
-      const memoryContext =
-        enabledMemories.length > 0
-          ? `Shopping preferences to consider when relevant:
-${enabledMemories.map((memory) => `- ${memory.content}`).join("\n")}
-Apply these preferences only when compatible with the current request. Explicit requirements in the current request take priority.`
-          : "";
-      const requestMessage = [activeText, memoryContext]
-        .filter(Boolean)
-        .join("\n\n");
+      let currentConversation = conversations.find(
+        (item) => item.id === activeConversationId,
+      );
+      let localConversationId = currentConversation?.id;
+      if (!localConversationId) {
+        localConversationId = createConversation();
+        currentConversation = {
+          id: localConversationId,
+          title: "New conversation",
+          turns: [],
+          channel3ConversationId: null,
+        };
+      }
+
+      const conversationTitle =
+        currentConversation?.title && currentConversation.title !== "New conversation"
+          ? currentConversation.title
+          : (activeText || "Image search").slice(0, 52);
 
       setSearching(true);
       setError("");
@@ -661,32 +624,29 @@ Apply these preferences only when compatible with the current request. Explicit 
       setSearchComplete(false);
 
       try {
-        let data;
-        if (activeImage) {
-          const response = await fetch("/api/products/search", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              base64Image: activeImage,
-              query: requestMessage || undefined,
-              limit: 10,
-            }),
-          });
-          data = await readApiResponse(response);
-          if (!data.success) {
-            throw new Error(
-              data.error || "Failed to search products by image.",
-            );
-          }
-        } else {
-          const response = await fetch(`${API_BASE}/api/ai/recommendations`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              message: requestMessage,
-            }),
-          });
-          data = await readApiResponse(response);
+        const headers = { "Content-Type": "application/json" };
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`;
+        }
+
+        const response = await fetch("/api/conversations/turn", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            message: activeText,
+            imageData: activeImage || undefined,
+            localConversationId,
+            channel3ConversationId:
+              currentConversation?.channel3ConversationId || undefined,
+            previousTurns: userId
+              ? undefined
+              : currentConversation?.turns || [],
+            title: conversationTitle,
+          }),
+        });
+        const data = await readApiResponse(response);
+        if (!data.success) {
+          throw new Error(data.error || "Channel3 could not process this request.");
         }
 
         const results = Array.isArray(data.recommendations)
@@ -704,7 +664,7 @@ Apply these preferences only when compatible with the current request. Explicit 
           if (!product?.productId) return;
           const offers = getOffers(rec);
           const matchIdx = offers.findIndex(
-            (o) => o.productUrl === rec.selectedOffer?.productUrl,
+            (offer) => offer.productUrl === rec.selectedOffer?.productUrl,
           );
           defaultOffers[product.productId] = matchIdx >= 0 ? matchIdx : 0;
           if (!updatedQuantities[product.productId]) {
@@ -713,26 +673,35 @@ Apply these preferences only when compatible with the current request. Explicit 
         });
         setSelectedOffers(defaultOffers);
         saveQuantities(updatedQuantities);
-        persistConversationTurn({
-          query: activeText,
-          imageSearch: Boolean(activeImage),
-          recommendations: results,
-          intent: data.intent || null,
-          notice: data.notice || "",
-          status: "complete",
-        });
+        persistConversationTurn(
+          {
+            query: activeText,
+            imageSearch: Boolean(activeImage),
+            recommendations: results,
+            intent: data.intent || null,
+            notice: data.notice || "",
+            assistantMessage: data.assistantMessage || "",
+            status: "complete",
+          },
+          localConversationId,
+          data.channel3ConversationId,
+        );
       } catch (requestError) {
         const message =
           requestError.message ||
-          "Could not reach the shopping service. Make sure backend is running.";
+          "Could not reach Channel3. Please check the server configuration and retry.";
         setError(message);
-        persistConversationTurn({
-          query: activeText,
-          imageSearch: Boolean(activeImage),
-          recommendations: [],
-          status: "error",
-          error: message,
-        });
+        persistConversationTurn(
+          {
+            query: activeText,
+            imageSearch: Boolean(activeImage),
+            recommendations: [],
+            status: "error",
+            error: message,
+          },
+          localConversationId,
+          currentConversation?.channel3ConversationId,
+        );
       } finally {
         setSearching(false);
       }
@@ -742,7 +711,12 @@ Apply these preferences only when compatible with the current request. Explicit 
       uploadedImagePreview,
       quantities,
       saveQuantities,
-      memories,
+      conversations,
+      activeConversationId,
+      createConversation,
+      authLoading,
+      accessToken,
+      userId,
       persistConversationTurn,
     ],
   );
@@ -751,17 +725,22 @@ Apply these preferences only when compatible with the current request. Explicit 
   useEffect(() => {
     const key = `${urlQuery}::${uploadedImagePreview ? "img" : "noimg"}`;
     if (
+      !authLoading &&
       (urlQuery || uploadedImagePreview) &&
       lastExecutedKeyRef.current !== key
     ) {
       lastExecutedKeyRef.current = key;
       executeSearch(urlQuery, uploadedImagePreview);
     }
-  }, [urlQuery, uploadedImagePreview, executeSearch]);
+  }, [urlQuery, uploadedImagePreview, executeSearch, authLoading]);
 
   // Form submit from top search bar
   function handleFormSearch(event, overrideQuery) {
     if (event) event.preventDefault();
+    if (authLoading) {
+      setError("Please wait for your account to finish loading before searching.");
+      return;
+    }
     const targetQuery = (
       overrideQuery !== undefined ? overrideQuery : query
     ).trim();
@@ -777,6 +756,10 @@ Apply these preferences only when compatible with the current request. Explicit 
   // Image search from top search bar
   function handleImageSearch(file) {
     if (!file) return;
+    if (authLoading) {
+      setError("Please wait for your account to finish loading before searching.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result;
@@ -1017,10 +1000,10 @@ Apply these preferences only when compatible with the current request. Explicit 
           +
         </div>
 
-        {/* Top Header Bar: Top Left Chat & Memory Controls + Centered Search Bar + Top Right X Close Button */}
+        {/* Top Header Bar: Conversation controls, search, and close button */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-zinc-200 py-3.5 px-4 sm:px-6 shadow-[0_4px_20px_-8px_rgba(0,0,0,0.05)]">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4">
-            {/* Chat and memory controls */}
+            {/* Conversation controls */}
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
@@ -1034,10 +1017,7 @@ Apply these preferences only when compatible with the current request. Explicit 
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setIsMemoryOpen(false);
-                  setIsHistoryOpen(true);
-                }}
+                onClick={() => setIsHistoryOpen(true)}
                 title="Open saved shopping conversations"
                 aria-label="Conversation history"
                 className="relative inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all cursor-pointer"
@@ -1047,24 +1027,6 @@ Apply these preferences only when compatible with the current request. Explicit 
                 {conversations.length > 0 && (
                   <span className="text-[10px] font-bold text-emerald-700">
                     {conversations.length}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsHistoryOpen(false);
-                  setIsMemoryOpen(true);
-                }}
-                title="Manage remembered shopping preferences"
-                aria-label="Shopping memory"
-                className="relative inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all cursor-pointer"
-              >
-                <Brain className="w-4 h-4" />
-                <span className="hidden lg:inline">Memory</span>
-                {memories.length > 0 && (
-                  <span className="text-[10px] font-bold text-emerald-700">
-                    {memories.length}
                   </span>
                 )}
               </button>
@@ -1188,6 +1150,10 @@ Apply these preferences only when compatible with the current request. Explicit 
                     key={item}
                     type="button"
                     onClick={() => {
+                      if (authLoading) {
+                        setError("Please wait for your account to finish loading before searching.");
+                        return;
+                      }
                       setQuery(item);
                       lastExecutedKeyRef.current = `${item}::noimg`;
                       router.replace(
@@ -1259,18 +1225,9 @@ Apply these preferences only when compatible with the current request. Explicit 
         onRenameConversation={handleRenameConversation}
         onDeleteConversation={handleDeleteConversation}
         onClearHistory={handleClearHistory}
+        isAuthenticated={Boolean(userId)}
       />
 
-      {/* Remembered shopping preferences */}
-      <MemoryManagerDrawer
-        isOpen={isMemoryOpen}
-        onClose={() => setIsMemoryOpen(false)}
-        memories={memories}
-        onAddMemory={handleAddMemory}
-        onToggleMemory={handleToggleMemory}
-        onDeleteMemory={handleDeleteMemory}
-        onClearMemories={handleClearMemories}
-      />
 
       {/* Product Detail Overlay Modal */}
       {detailProduct && (

@@ -32,6 +32,7 @@ export default function ChatHistoryDrawer({
   onRenameConversation,
   onDeleteConversation,
   onClearHistory,
+  isAuthenticated = false,
 }) {
   const [editingId, setEditingId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
@@ -235,7 +236,9 @@ export default function ChatHistoryDrawer({
         </div>
 
         <div className="px-5 py-3 border-t border-slate-200 text-[11px] text-slate-500">
-          Conversation history is saved in this browser on this device.
+          {isAuthenticated
+            ? "Conversation history is saved to your account."
+            : "Conversation history is saved in this browser on this device."}
         </div>
       </aside>
     </div>
