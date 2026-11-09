@@ -6,13 +6,12 @@ import { supabase, isSupabaseConfigured, signOutUser } from "@/lib/supabase";
 export function useAuth() {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => Boolean(isSupabaseConfigured && supabase),
+  );
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) {
-      setLoading(false);
-      return;
-    }
+    if (!isSupabaseConfigured || !supabase) return;
 
     // Get current session on load
     supabase.auth.getSession().then(({ data: { session } }) => {

@@ -10,7 +10,6 @@ const STORAGE_KEYS = {
   PENDING_CHECKOUT: "quickown_pending_checkout",
   CONVERSATIONS: "quickown_conversations",
   ACTIVE_CONVERSATION: "quickown_active_conversation",
-  MEMORIES: "quickown_shopping_memories",
 };
 
 export function getStoredCart() {
@@ -253,18 +252,4 @@ export function saveStoredActiveConversationId(conversationId) {
   } catch (error) {
     console.error("Failed to save active conversation", error);
   }
-}
-
-export function getStoredMemories() {
-  const memories = getStoredJson(STORAGE_KEYS.MEMORIES, []);
-  return Array.isArray(memories) ? memories : [];
-}
-
-export function saveStoredMemories(memories) {
-  const safeMemories = Array.isArray(memories) ? memories.slice(0, 20) : [];
-  saveStoredJson(
-    STORAGE_KEYS.MEMORIES,
-    safeMemories,
-    "quickown_memories_updated",
-  );
 }

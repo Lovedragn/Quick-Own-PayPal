@@ -11,6 +11,8 @@ import {
   saveStoredPendingCheckout,
   saveStoredCart,
 } from "@/lib/storage";
+import { useAuth } from "@/lib/useAuth";
+import { saveRemoteOrder } from "@/lib/supabase";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -21,8 +23,15 @@ export default function CheckoutSuccessPage() {
   const [status, setStatus] = useState("loading");
   const [result, setResult] = useState(null);
   const [message, setMessage] = useState("");
+  const [pendingRemoteOrder, setPendingRemoteOrder] = useState(null);
+  const { user } = useAuth();
   const orderIdRef = useRef("");
   const started = useRef(false);
+
+  useEffect(() => {
+    if (!user?.id || !pendingRemoteOrder) return;
+    void saveRemoteOrder(pendingRemoteOrder, user.id);
+  }, [user?.id, pendingRemoteOrder]);
 
   const capture = useCallback(async (id) => {
     if (!id) {
@@ -65,6 +74,10 @@ export default function CheckoutSuccessPage() {
         (o) => o.orderId === data.orderId || o.captureId === data.captureId,
       );
 
+      let orderToPersist = existingOrders.find(
+        (order) => order.orderId === data.orderId || order.captureId === data.captureId,
+      ) || null;
+
       if (!isAlreadyRecorded) {
         const newOrder = {
           orderId: data.orderId || id,
@@ -98,6 +111,10 @@ export default function CheckoutSuccessPage() {
           }),
         };
         saveStoredOrders([newOrder, ...existingOrders]);
+        orderToPersist = newOrder;
+      }
+      if (orderToPersist) {
+        setPendingRemoteOrder(orderToPersist);
       }
 
       // If checkout originated from Cart, empty cart

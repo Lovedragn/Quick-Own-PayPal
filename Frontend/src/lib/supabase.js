@@ -108,6 +108,7 @@ export async function fetchRemoteConversations(userId) {
       .from("conversation_turns")
       .select("*")
       .in("conversation_id", convIds)
+      .eq("user_id", userId)
       .order("created_at", { ascending: true });
 
     if (turnsError) {
@@ -124,6 +125,7 @@ export async function fetchRemoteConversations(userId) {
         createdAt: t.created_at,
         resultCount: Array.isArray(t.recommendations) ? t.recommendations.length : 0,
         recommendations: t.recommendations || [],
+        assistantMessage: t.assistant_message || "",
         intent: t.intent || null,
         notice: t.notice || "",
         error: t.error || "",
@@ -136,6 +138,7 @@ export async function fetchRemoteConversations(userId) {
       title: c.title || "Shopping conversation",
       createdAt: c.created_at,
       updatedAt: c.updated_at,
+      channel3ConversationId: c.channel3_conversation_id || null,
       turns: turnsByConv[c.id] || [],
     }));
   } catch (err) {
@@ -148,41 +151,155 @@ export async function saveRemoteConversation(conversation, userId) {
   if (!supabase || !userId || !conversation?.id) return;
   try {
     const now = new Date().toISOString();
-    await supabase.from("conversations").upsert({
+    const { error } = await supabase.from("conversations").upsert({
       id: conversation.id,
       user_id: userId,
       title: conversation.title || "Shopping conversation",
       updated_at: conversation.updatedAt || now,
+      ...(conversation.channel3ConversationId
+        ? { channel3_conversation_id: conversation.channel3ConversationId }
+        : {}),
     });
+    if (error) {
+      console.error("Could not save conversation to Supabase:", error.message);
+    }
   } catch (err) {
     console.error("saveRemoteConversation error:", err);
   }
 }
 
-export async function saveRemoteTurn(turnData, conversationId, userId) {
-  if (!supabase || !userId || !conversationId) return;
-  try {
-    const now = new Date().toISOString();
-    await supabase.from("conversations").upsert({
-      id: conversationId,
-      user_id: userId,
-      updated_at: now,
-    });
+// ==========================================
+// WISHLIST + COMPLETED ORDER PERSISTENCE
+// ==========================================
 
-    await supabase.from("conversation_turns").insert({
-      conversation_id: conversationId,
+export async function fetchRemoteUserData(userId) {
+  if (!supabase || !userId) {
+    return { likedIds: [], likedProductDetails: {}, orders: [] };
+  }
+
+  const [wishlistResult, ordersResult] = await Promise.all([
+    supabase
+      .from("user_wishlist_items")
+      .select("product_id,item_data")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("user_orders")
+      .select("order_data")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (wishlistResult.error) {
+    throw new Error(`Could not load wishlist from Supabase: ${wishlistResult.error.message}`);
+  }
+  if (ordersResult.error) {
+    throw new Error(`Could not load orders from Supabase: ${ordersResult.error.message}`);
+  }
+
+  const likedProductDetails = {};
+  const likedIds = [];
+  for (const row of wishlistResult.data || []) {
+    const productId = String(row.product_id || "");
+    if (!productId) continue;
+    likedIds.push(productId);
+    likedProductDetails[productId] = row.item_data || {
+      product: { productId },
+      selectedOffer: null,
+    };
+  }
+
+  const orders = (ordersResult.data || [])
+    .map((row) => row.order_data)
+    .filter((order) => order && order.orderId);
+
+  return { likedIds, likedProductDetails, orders };
+}
+
+export async function syncRemoteWishlistSnapshot(userId, likedIds = [], likedProductDetails = {}) {
+  if (!supabase || !userId) return;
+
+  const normalizedIds = [...new Set((likedIds || []).map(String).filter(Boolean))];
+  const { data: existingRows, error: readError } = await supabase
+    .from("user_wishlist_items")
+    .select("product_id")
+    .eq("user_id", userId);
+  if (readError) {
+    console.error("Could not inspect Supabase wishlist:", readError.message);
+    return;
+  }
+
+  const desired = new Set(normalizedIds);
+  const staleIds = (existingRows || [])
+    .map((row) => String(row.product_id))
+    .filter((productId) => !desired.has(productId));
+
+  for (const productId of staleIds) {
+    const { error } = await supabase
+      .from("user_wishlist_items")
+      .delete()
+      .eq("user_id", userId)
+      .eq("product_id", productId);
+    if (error) {
+      console.error("Could not remove stale Supabase wishlist item:", error.message);
+    }
+  }
+
+  if (normalizedIds.length === 0) return;
+
+  const rows = normalizedIds.map((productId) => ({
+    user_id: userId,
+    product_id: productId,
+    item_data: likedProductDetails[productId] || {
+      product: { productId },
+      selectedOffer: null,
+    },
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error: upsertError } = await supabase
+    .from("user_wishlist_items")
+    .upsert(rows, { onConflict: "user_id,product_id" });
+  if (upsertError) {
+    console.error("Could not sync Supabase wishlist:", upsertError.message);
+  }
+}
+
+export async function saveRemoteOrder(order, userId) {
+  if (!supabase || !userId || !order?.orderId) return;
+  const { error } = await supabase.from("user_orders").upsert(
+    {
       user_id: userId,
-      query: turnData.query || "",
-      image_search: Boolean(turnData.imageSearch),
-      status: turnData.status || "complete",
-      recommendations: turnData.recommendations || [],
-      intent: turnData.intent || null,
-      notice: turnData.notice || "",
-      error: turnData.error || "",
-      created_at: turnData.createdAt || now,
-    });
-  } catch (err) {
-    console.error("saveRemoteTurn error:", err);
+      order_id: String(order.orderId),
+      order_data: order,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,order_id" },
+  );
+  if (error) {
+    console.error("Could not save completed order to Supabase:", error.message);
+  }
+}
+
+export async function syncRemoteOrdersSnapshot(userId, orders = []) {
+  if (!supabase || !userId || !Array.isArray(orders) || orders.length === 0) return;
+
+  const rows = orders
+    .filter((order) => order?.orderId)
+    .map((order) => ({
+      user_id: userId,
+      order_id: String(order.orderId),
+      order_data: order,
+      updated_at: new Date().toISOString(),
+    }));
+
+  if (rows.length === 0) return;
+
+  const { error } = await supabase
+    .from("user_orders")
+    .upsert(rows, { onConflict: "user_id,order_id" });
+  if (error) {
+    console.error("Could not sync Supabase orders:", error.message);
   }
 }
 
