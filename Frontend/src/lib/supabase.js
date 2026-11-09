@@ -297,19 +297,31 @@ export async function syncRemoteWishlistSnapshot(userId, likedIds = [], likedPro
   }
 }
 
-export async function saveRemoteOrder(order, userId) {
-  if (!supabase || !userId || !order?.orderId) return;
-  const { error } = await supabase.from("user_orders").upsert(
-    {
-      user_id: userId,
-      order_id: String(order.orderId),
-      order_data: order,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,order_id" },
-  );
-  if (error) {
-    console.error("Could not save completed order to Supabase:", error.message);
+export async function saveRemoteOrder(first, second) {
+  if (!supabase || !first || !second) return null;
+  const userId = typeof first === "string" ? first : second;
+  const order = typeof first === "string" ? second : first;
+  const orderId = order?.orderId || order?.id;
+  if (!userId || !orderId) return null;
+
+  try {
+    const { data, error } = await supabase.from("user_orders").upsert(
+      {
+        user_id: userId,
+        order_id: String(orderId),
+        order_data: order,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,order_id" },
+    );
+    if (error) {
+      console.error("Could not save completed order to Supabase:", error.message);
+      return null;
+    }
+    return data || order;
+  } catch (err) {
+    console.error("saveRemoteOrder unexpected error:", err);
+    return null;
   }
 }
 
@@ -357,6 +369,121 @@ export async function clearRemoteConversations(userId) {
       .eq("user_id", userId);
   } catch (err) {
     console.error("clearRemoteConversations error:", err);
+  }
+}
+
+// ==========================================
+// CART SUPABASE HELPERS
+// ==========================================
+
+export async function fetchRemoteCart(userId) {
+  if (!supabase || !userId) return [];
+  try {
+    const { data, error } = await supabase
+      .from("user_carts")
+      .select("items")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("fetchRemoteCart error:", error.message);
+      return [];
+    }
+    return Array.isArray(data?.items) ? data.items : [];
+  } catch (err) {
+    console.error("fetchRemoteCart unexpected error:", err);
+    return [];
+  }
+}
+
+export async function saveRemoteCart(userId, items) {
+  if (!supabase || !userId) return;
+  try {
+    const safeItems = Array.isArray(items) ? items : [];
+    const { error } = await supabase.from("user_carts").upsert({
+      user_id: userId,
+      items: safeItems,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) {
+      console.warn("saveRemoteCart error:", error.message);
+    }
+  } catch (err) {
+    console.error("saveRemoteCart unexpected error:", err);
+  }
+}
+
+// ==========================================
+// WISHLIST / LIKES SUPABASE HELPERS
+// ==========================================
+
+export async function fetchRemoteWishlist(userId) {
+  if (!supabase || !userId) return { likedIds: [], likedDetails: {} };
+  try {
+    const { data, error } = await supabase
+      .from("user_wishlists")
+      .select("liked_ids, liked_details")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("fetchRemoteWishlist error:", error.message);
+      return { likedIds: [], likedDetails: {} };
+    }
+    return {
+      likedIds: Array.isArray(data?.liked_ids) ? data.liked_ids : [],
+      likedDetails:
+        data?.liked_details && typeof data.liked_details === "object"
+          ? data.liked_details
+          : {},
+    };
+  } catch (err) {
+    console.error("fetchRemoteWishlist unexpected error:", err);
+    return { likedIds: [], likedDetails: {} };
+  }
+}
+
+export async function saveRemoteWishlist(userId, likedIds, likedDetails) {
+  if (!supabase || !userId) return;
+  try {
+    const safeIds = Array.isArray(likedIds) ? likedIds : [];
+    const safeDetails =
+      likedDetails && typeof likedDetails === "object" ? likedDetails : {};
+    const { error } = await supabase.from("user_wishlists").upsert({
+      user_id: userId,
+      liked_ids: safeIds,
+      liked_details: safeDetails,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) {
+      console.warn("saveRemoteWishlist error:", error.message);
+    }
+  } catch (err) {
+    console.error("saveRemoteWishlist unexpected error:", err);
+  }
+}
+
+// ==========================================
+// ORDERS SUPABASE HELPERS
+// ==========================================
+
+export async function fetchRemoteOrders(userId) {
+  if (!supabase || !userId) return [];
+  try {
+    const { data, error } = await supabase
+      .from("user_orders")
+      .select("order_data")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.warn("fetchRemoteOrders error:", error.message);
+      return [];
+    }
+    return (data || []).map((row) => row.order_data).filter(Boolean);
+  } catch (err) {
+    console.error("fetchRemoteOrders unexpected error:", err);
+    return [];
   }
 }
 

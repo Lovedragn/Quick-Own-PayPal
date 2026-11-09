@@ -4,6 +4,7 @@ import {
   saveStoredCart,
   getStoredLikedProducts,
   saveStoredLikedProducts,
+  getStoredLikedProductDetails,
   saveStoredLikedProductDetails,
   getStoredPagination,
   saveStoredPagination,
@@ -14,24 +15,78 @@ import {
   saveStoredConversations,
   saveStoredActiveConversationId,
 } from "@/lib/storage";
+import {
+  supabase,
+  fetchRemoteCart,
+  saveRemoteCart,
+  fetchRemoteWishlist,
+  saveRemoteWishlist,
+  fetchRemoteOrders,
+  saveRemoteOrder,
+} from "@/lib/supabase";
+
+let activeUserId = null;
+
+async function syncFromSupabase(userId) {
+  if (!userId) return;
+  try {
+    const [cart, wishlist, orders] = await Promise.all([
+      fetchRemoteCart(userId),
+      fetchRemoteWishlist(userId),
+      fetchRemoteOrders(userId),
+    ]);
+    if (Array.isArray(cart)) {
+      saveStoredCart(cart);
+    }
+    if (wishlist) {
+      saveStoredLikedProducts(wishlist.likedIds || []);
+      saveStoredLikedProductDetails(wishlist.likedDetails || {});
+    }
+    if (Array.isArray(orders)) {
+      saveStoredOrders(orders);
+    }
+  } catch (err) {
+    console.error("Failed to sync from Supabase:", err);
+  }
+}
+
+if (typeof window !== "undefined" && supabase) {
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    const user = session?.user;
+    if (user) {
+      activeUserId = user.id;
+      void syncFromSupabase(user.id);
+    }
+  });
+
+  supabase.auth.onAuthStateChange(async (_event, session) => {
+    const user = session?.user;
+    if (user) {
+      activeUserId = user.id;
+      await syncFromSupabase(user.id);
+    } else {
+      activeUserId = null;
+      saveStoredCart([]);
+      saveStoredLikedProducts([]);
+      saveStoredLikedProductDetails({});
+      saveStoredOrders([]);
+    }
+  });
+}
 
 function subscribeCart(callback) {
   if (typeof window === "undefined") return () => {};
   window.addEventListener("quickown_cart_updated", callback);
-  window.addEventListener("storage", callback);
   return () => {
     window.removeEventListener("quickown_cart_updated", callback);
-    window.removeEventListener("storage", callback);
   };
 }
 
 function subscribeLikes(callback) {
   if (typeof window === "undefined") return () => {};
   window.addEventListener("quickown_likes_updated", callback);
-  window.addEventListener("storage", callback);
   return () => {
     window.removeEventListener("quickown_likes_updated", callback);
-    window.removeEventListener("storage", callback);
   };
 }
 
@@ -48,77 +103,75 @@ function subscribeQuantities(callback) {
 function subscribeOrders(callback) {
   if (typeof window === "undefined") return () => {};
   window.addEventListener("quickown_orders_updated", callback);
-  window.addEventListener("storage", callback);
   return () => {
     window.removeEventListener("quickown_orders_updated", callback);
-    window.removeEventListener("storage", callback);
   };
 }
 
 let emptyCart = [];
 export function useCartPreference() {
-  const cartJson = useSyncExternalStore(
+  const cart = useSyncExternalStore(
     subscribeCart,
-    () => {
-      if (typeof window === "undefined") return "[]";
-      return localStorage.getItem("quickown_cart") || "[]";
-    },
-    () => "[]"
+    getStoredCart,
+    () => emptyCart,
   );
 
-  let cart = emptyCart;
-  try {
-    cart = JSON.parse(cartJson);
-  } catch {
-    cart = emptyCart;
-  }
+  const saveCart = (nextCart) => {
+    saveStoredCart(nextCart);
+    if (activeUserId) {
+      void saveRemoteCart(activeUserId, nextCart);
+    }
+  };
 
-  return [cart, saveStoredCart];
+  return [cart, saveCart];
 }
 
 let emptyLikes = [];
 export function useLikesPreference() {
-  const likesJson = useSyncExternalStore(
+  const likes = useSyncExternalStore(
     subscribeLikes,
-    () => {
-      if (typeof window === "undefined") return "[]";
-      return localStorage.getItem("quickown_liked_products") || "[]";
-    },
-    () => "[]"
+    getStoredLikedProducts,
+    () => emptyLikes,
   );
 
-  let likes = emptyLikes;
-  try {
-    likes = JSON.parse(likesJson);
-  } catch {
-    likes = emptyLikes;
-  }
+  const saveLikes = (nextLikes) => {
+    saveStoredLikedProducts(nextLikes);
+    if (activeUserId) {
+      void saveRemoteWishlist(
+        activeUserId,
+        nextLikes,
+        getStoredLikedProductDetails(),
+      );
+    }
+  };
 
-  return [likes, saveStoredLikedProducts];
+  return [likes, saveLikes];
 }
 
+let emptyDetails = {};
 export function useLikedProductDetailsPreference() {
-  const detailsJson = useSyncExternalStore(
+  const details = useSyncExternalStore(
     (callback) =>
-      subscribeLocalPreference("quickown_liked_product_details_updated", callback),
-    () =>
-      typeof window === "undefined"
-        ? "{}"
-        : localStorage.getItem("quickown_liked_product_details") || "{}",
-    () => "{}",
+      subscribeLocalPreference(
+        "quickown_liked_product_details_updated",
+        callback,
+      ),
+    getStoredLikedProductDetails,
+    () => emptyDetails,
   );
 
-  let details = {};
-  try {
-    const parsed = JSON.parse(detailsJson);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      details = parsed;
+  const saveDetails = (nextDetails) => {
+    saveStoredLikedProductDetails(nextDetails);
+    if (activeUserId) {
+      void saveRemoteWishlist(
+        activeUserId,
+        getStoredLikedProducts(),
+        nextDetails,
+      );
     }
-  } catch {
-    details = {};
-  }
+  };
 
-  return [details, saveStoredLikedProductDetails];
+  return [details, saveDetails];
 }
 
 let emptyQuantities = {};
@@ -144,23 +197,22 @@ export function useQuantitiesPreference() {
 
 let emptyOrders = [];
 export function useOrdersPreference() {
-  const ordersJson = useSyncExternalStore(
+  const orders = useSyncExternalStore(
     subscribeOrders,
-    () => {
-      if (typeof window === "undefined") return "[]";
-      return localStorage.getItem("quickown_orders") || "[]";
-    },
-    () => "[]"
+    getStoredOrders,
+    () => emptyOrders,
   );
 
-  let orders = emptyOrders;
-  try {
-    orders = JSON.parse(ordersJson);
-  } catch {
-    orders = emptyOrders;
-  }
+  const saveOrders = (nextOrders) => {
+    saveStoredOrders(nextOrders);
+    if (activeUserId && Array.isArray(nextOrders)) {
+      nextOrders.forEach((o) => {
+        void saveRemoteOrder(activeUserId, o);
+      });
+    }
+  };
 
-  return [orders, saveStoredOrders];
+  return [orders, saveOrders];
 }
 
 

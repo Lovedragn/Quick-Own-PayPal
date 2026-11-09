@@ -1,76 +1,63 @@
-// Helper for Local Storage persistence
+// Storage helpers - Cart, Wishlist, Orders stored in memory & synced with Supabase (NOT local storage)
 
 const STORAGE_KEYS = {
-  CART: "quickown_cart",
-  LIKES: "quickown_liked_products",
-  LIKED_PRODUCT_DETAILS: "quickown_liked_product_details",
   PAGINATION: "quickown_pagination",
   QUANTITIES: "quickown_quantities",
-  ORDERS: "quickown_orders",
   PENDING_CHECKOUT: "quickown_pending_checkout",
   CONVERSATIONS: "quickown_conversations",
   ACTIVE_CONVERSATION: "quickown_active_conversation",
 };
 
-export function getStoredCart() {
-  if (typeof window === "undefined") return [];
+// In-memory state for Cart, Wishlist, and Orders
+let memoryCart = [];
+let memoryLikes = [];
+let memoryLikedProductDetails = {};
+let memoryOrders = [];
+
+// Clean up any legacy localStorage items if present
+if (typeof window !== "undefined") {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.CART);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error("Failed to read cart from local storage", e);
-    return [];
-  }
+    localStorage.removeItem("quickown_cart");
+    localStorage.removeItem("quickown_liked_products");
+    localStorage.removeItem("quickown_liked_product_details");
+    localStorage.removeItem("quickown_orders");
+  } catch {}
+}
+
+export function getStoredCart() {
+  return memoryCart;
 }
 
 export function saveStoredCart(cart) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cart));
+  memoryCart = Array.isArray(cart) ? [...cart] : [];
+  if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("quickown_cart_updated"));
-  } catch (e) {
-    console.error("Failed to save cart to local storage", e);
   }
 }
 
 export function getStoredLikedProducts() {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.LIKES);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error("Failed to read likes from local storage", e);
-    return [];
-  }
+  return memoryLikes;
 }
 
 export function saveStoredLikedProducts(likedIds) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEYS.LIKES, JSON.stringify(likedIds));
+  memoryLikes = Array.isArray(likedIds) ? [...likedIds] : [];
+  if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("quickown_likes_updated"));
-  } catch (e) {
-    console.error("Failed to save likes to local storage", e);
   }
 }
 
 export function getStoredLikedProductDetails() {
-  const details = getStoredJson(STORAGE_KEYS.LIKED_PRODUCT_DETAILS, {});
-  return details && typeof details === "object" && !Array.isArray(details)
-    ? details
-    : {};
+  return memoryLikedProductDetails;
 }
 
 export function saveStoredLikedProductDetails(details) {
-  const safeDetails =
+  memoryLikedProductDetails =
     details && typeof details === "object" && !Array.isArray(details)
-      ? details
+      ? { ...details }
       : {};
-  saveStoredJson(
-    STORAGE_KEYS.LIKED_PRODUCT_DETAILS,
-    safeDetails,
-    "quickown_liked_product_details_updated",
-  );
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("quickown_liked_product_details_updated"));
+  }
 }
 
 export function createStoredLikedProduct(recommendation) {
@@ -150,23 +137,13 @@ export function saveStoredQuantities(quantities) {
 }
 
 export function getStoredOrders() {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.ORDERS);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error("Failed to read orders from local storage", e);
-    return [];
-  }
+  return memoryOrders;
 }
 
 export function saveStoredOrders(orders) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+  memoryOrders = Array.isArray(orders) ? [...orders] : [];
+  if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("quickown_orders_updated"));
-  } catch (e) {
-    console.error("Failed to save orders to local storage", e);
   }
 }
 
