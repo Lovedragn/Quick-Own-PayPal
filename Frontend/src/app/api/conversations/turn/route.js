@@ -268,10 +268,10 @@ export async function POST(request) {
       ...(user ? { "x-user-id": user.id } : {}),
     };
 
-    const stream = await channel3.conversations.createTurnStream(requestBody, {
-      country: "IN",
-      currency: "INR",
-    });
+    // Channel3 currently does not accept IN/INR. Country and currency are
+    // optional in the SDK; omitting them lets Channel3 use its documented
+    // pan-region default (USD) instead of rejecting the conversation with 422.
+    const stream = await channel3.conversations.createTurnStream(requestBody);
 
     let channel3ConversationId = resolvedExistingConversationId || null;
     let completed = false;
