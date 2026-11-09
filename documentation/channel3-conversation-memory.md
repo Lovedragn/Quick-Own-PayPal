@@ -52,5 +52,10 @@ The route also accepts `CHANNELV3_SECRET` as an alternative Channel3 key name. S
 - Conversational turns: `client.conversations.createTurnStream()`
 - Existing thread: send `conversation_id` on the next turn
 - Thread history retrieval for diagnostics: `client.conversations.retrieve()`
+- Locale configuration: country and currency are optional in the installed SDK's `BaseConfig`.
+
+### Country and currency limitation
+
+The current Channel3 API validation does not accept `IN` as a country or `INR` as a currency. The conversation route therefore omits country and currency rather than sending invalid headers. Channel3 applies its documented pan-region/default currency behavior (USD) when no locale is supplied. Product prices must be displayed using the currency included in each actual offer; do not relabel USD offers as INR or imply that Channel3 returned India-specific pricing.
 
 No separate Channel3 memory-management API is used by the current TypeScript SDK integration; the persistent conversational thread is the memory mechanism used by Quick-Own.
