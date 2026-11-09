@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase, isSupabaseConfigured, signOutUser } from "@/lib/supabase";
 
 export function useAuth() {
@@ -9,33 +9,55 @@ export function useAuth() {
   const [loading, setLoading] = useState(
     () => Boolean(isSupabaseConfigured && supabase),
   );
+  const authEventVersion = useRef(0);
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return;
+    if (!isSupabaseConfigured || !supabase) {
+      return undefined;
+    }
 
-    // Get current session on load
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    let mounted = true;
+    const initialVersion = authEventVersion.current;
 
-    // Listen to auth state transitions
+    // Subscribe before reading the persisted session so a SIGNED_IN event from
+    // the OAuth callback cannot be overwritten by a late initial session read.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      authEventVersion.current += 1;
+      if (!mounted) return;
+      setSession(nextSession ?? null);
+      setUser(nextSession?.user ?? null);
       setLoading(false);
     });
 
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!mounted || authEventVersion.current !== initialVersion) return;
+        if (error) throw error;
+        const currentSession = data?.session ?? null;
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (!mounted) return;
+        console.error("Could not restore Supabase session:", error);
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+      });
+
     return () => {
+      mounted = false;
       subscription?.unsubscribe();
     };
   }, []);
 
   const handleSignOut = async () => {
-    await signOutUser();
+    const { error } = await signOutUser();
+    if (error) throw error;
     setUser(null);
     setSession(null);
   };
@@ -48,4 +70,3 @@ export function useAuth() {
     signOut: handleSignOut,
   };
 }
-

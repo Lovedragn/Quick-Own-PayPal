@@ -4,13 +4,35 @@ const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   "https://thzyahamwbizvpcwaszx.supabase.co";
 
-const supabasePublishableKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
+const supabasePublishableKey = (
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || ""
+).trim();
+
+function isValidSupabaseKey(value) {
+  if (!value || value.includes("YOUR_") || value.includes("PLACEHOLDER")) {
+    return false;
+  }
+
+  // Supabase supports the newer publishable-key format and legacy anon JWT keys.
+  const publishableKey = /^sb_publishable_[A-Za-z0-9_-]{20,}$/;
+  const legacyAnonKey = /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+  return publishableKey.test(value) || legacyAnonKey.test(value);
+}
+
+function isValidSupabaseUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return (
+      (parsed.protocol === "https:" || parsed.protocol === "http:") &&
+      Boolean(parsed.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
 
 export const isSupabaseConfigured = Boolean(
-  supabaseUrl &&
-    supabasePublishableKey &&
-    supabasePublishableKey !== "YOUR_SUPABASE_PUBLISHABLE_KEY"
+  isValidSupabaseUrl(supabaseUrl) && isValidSupabaseKey(supabasePublishableKey),
 );
 
 export const supabase = isSupabaseConfigured
@@ -18,7 +40,9 @@ export const supabase = isSupabaseConfigured
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: true,
+        // OAuth and email-confirmation codes are exchanged explicitly by /auth/callback.
+        detectSessionInUrl: false,
+        flowType: "pkce",
       },
     })
   : null;
@@ -27,27 +51,36 @@ export const supabase = isSupabaseConfigured
 // AUTH HELPERS
 // ==========================================
 
+function getAuthCallbackUrl() {
+  if (typeof window === "undefined") {
+    throw new Error("Google sign-in must be started in the browser.");
+  }
+  return new URL("/auth/callback", window.location.origin).toString();
+}
+
 export async function signInWithGoogle() {
   if (!supabase) {
     throw new Error(
-      "Supabase is not configured yet. Please add NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to .env.local"
+      "Supabase publishable key is missing or invalid. Copy the complete Publishable key (sb_publishable_...) or legacy anon key from Supabase Project Settings → API Keys into NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, then restart the frontend.",
     );
   }
-  const redirectTo = typeof window !== "undefined" ? window.location.origin : undefined;
+
   return await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo,
+      redirectTo: getAuthCallbackUrl(),
     },
   });
 }
 
+function getSupabaseConfigurationError() {
+  return new Error(
+    "Supabase publishable key is missing or invalid. Copy the complete Publishable key (sb_publishable_...) or legacy anon key from Supabase Project Settings → API Keys into NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, then restart the frontend.",
+  );
+}
+
 export async function signInWithPassword(email, password) {
-  if (!supabase) {
-    throw new Error(
-      "Supabase is not configured yet. Please add NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to .env.local"
-    );
-  }
+  if (!supabase) throw getSupabaseConfigurationError();
   return await supabase.auth.signInWithPassword({
     email,
     password,
@@ -55,14 +88,13 @@ export async function signInWithPassword(email, password) {
 }
 
 export async function signUpWithPassword(email, password) {
-  if (!supabase) {
-    throw new Error(
-      "Supabase is not configured yet. Please add NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to .env.local"
-    );
-  }
+  if (!supabase) throw getSupabaseConfigurationError();
   return await supabase.auth.signUp({
     email,
     password,
+    options: {
+      emailRedirectTo: getAuthCallbackUrl(),
+    },
   });
 }
 
