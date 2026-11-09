@@ -11,6 +11,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import ProductResultsSection from "@/components/ProductResultsSection";
+import ProductFilterSortBar from "@/components/ProductFilterSortBar";
 import CartDrawer from "@/components/CartDrawer";
 import LikesDrawer from "@/components/LikesDrawer";
 import OrdersDrawer from "@/components/OrdersDrawer";
@@ -23,6 +24,7 @@ import {
   AlertCircle,
   History,
   MessageSquarePlus,
+  Plus,
   Sparkles,
   X,
 } from "lucide-react";
@@ -137,6 +139,7 @@ function ProductsView() {
   const [searchComplete, setSearchComplete] = useState(false);
   const [detailProduct, setDetailProduct] = useState(null);
   const [detailVariantIndex, setDetailVariantIndex] = useState(0);
+  const [activeTurnId, setActiveTurnId] = useState(null);
   const checkoutAttemptRef = useRef(null);
   const lastExecutedKeyRef = useRef("");
 
@@ -166,6 +169,185 @@ function ProductsView() {
     orders,
     saveOrders,
   });
+
+  // Filters & Sorting state (Channel3 & ComponentX reference)
+  const [sortOption, setSortOption] = useState("relevance");
+  const [priceRange, setPriceRange] = useState({ min: "", max: "" });
+  const [selectedBrands, setSelectedBrands] = useState([]);
+  const [selectedMerchants, setSelectedMerchants] = useState([]);
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [dealsOnly, setDealsOnly] = useState(false);
+
+  const handleToggleBrand = useCallback((brandName) => {
+    setSelectedBrands((prev) =>
+      prev.includes(brandName)
+        ? prev.filter((b) => b !== brandName)
+        : [...prev, brandName]
+    );
+  }, []);
+
+  const handleToggleMerchant = useCallback((merchantName) => {
+    setSelectedMerchants((prev) =>
+      prev.includes(merchantName)
+        ? prev.filter((m) => m !== merchantName)
+        : [...prev, merchantName]
+    );
+  }, []);
+
+  const handleResetFilters = useCallback(() => {
+    setPriceRange({ min: "", max: "" });
+    setSelectedBrands([]);
+    setSelectedMerchants([]);
+    setInStockOnly(false);
+    setDealsOnly(false);
+    setSortOption("relevance");
+  }, []);
+
+  // Auto-dismiss notice banner after 10 seconds
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => {
+      setNotice("");
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  // Compute available brands dynamically from recommendations
+  const availableBrands = useMemo(() => {
+    const counts = {};
+    recommendations.forEach((rec) => {
+      const b = (rec.product?.brand || "").trim();
+      if (b) {
+        counts[b] = (counts[b] || 0) + 1;
+      }
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [recommendations]);
+
+  // Compute available merchants / retailers from recommendations
+  const availableMerchants = useMemo(() => {
+    const counts = {};
+    recommendations.forEach((rec) => {
+      const offers = getOffers(rec);
+      offers.forEach((o) => {
+        const d = (o.merchantDomain || o.merchant || "").trim();
+        if (d) {
+          counts[d] = (counts[d] || 0) + 1;
+        }
+      });
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [recommendations]);
+
+  // Real-time filtered & sorted recommendations
+  const filteredAndSortedRecommendations = useMemo(() => {
+    let list = [...recommendations];
+
+    // 1. In Stock
+    if (inStockOnly) {
+      list = list.filter((rec) => {
+        const offers = getOffers(rec);
+        return offers.length > 0
+          ? offers.some((o) => o.inStock !== false)
+          : rec.product?.inStock !== false;
+      });
+    }
+
+    // 2. Multi-Store Deals
+    if (dealsOnly) {
+      list = list.filter((rec) => {
+        const offers = getOffers(rec);
+        return offers.length > 1;
+      });
+    }
+
+    // 3. Brands
+    if (selectedBrands.length > 0) {
+      const brandSet = new Set(selectedBrands.map((b) => b.toLowerCase()));
+      list = list.filter((rec) => {
+        const b = (rec.product?.brand || "").toLowerCase().trim();
+        return brandSet.has(b);
+      });
+    }
+
+    // 4. Merchants
+    if (selectedMerchants.length > 0) {
+      const merchantSet = new Set(
+        selectedMerchants.map((m) => m.toLowerCase())
+      );
+      list = list.filter((rec) => {
+        const offers = getOffers(rec);
+        return offers.some((o) =>
+          merchantSet.has((o.merchantDomain || o.merchant || "").toLowerCase())
+        );
+      });
+    }
+
+    // 5. Price Range
+    const minP = priceRange.min !== "" ? parseFloat(priceRange.min) : null;
+    const maxP = priceRange.max !== "" ? parseFloat(priceRange.max) : null;
+    if (minP !== null || maxP !== null) {
+      list = list.filter((rec) => {
+        const price =
+          rec.selectedOffer?.price ||
+          rec.product?.offers?.[0]?.price ||
+          0;
+        if (minP !== null && !isNaN(minP) && price < minP) return false;
+        if (maxP !== null && !isNaN(maxP) && price > maxP) return false;
+        return true;
+      });
+    }
+
+    // 6. Sorting
+    switch (sortOption) {
+      case "price-low":
+        list.sort((a, b) => {
+          const pa = a.selectedOffer?.price ?? a.product?.offers?.[0]?.price ?? 0;
+          const pb = b.selectedOffer?.price ?? b.product?.offers?.[0]?.price ?? 0;
+          return pa - pb;
+        });
+        break;
+      case "price-high":
+        list.sort((a, b) => {
+          const pa = a.selectedOffer?.price ?? a.product?.offers?.[0]?.price ?? 0;
+          const pb = b.selectedOffer?.price ?? b.product?.offers?.[0]?.price ?? 0;
+          return pb - pa;
+        });
+        break;
+      case "name-asc":
+        list.sort((a, b) => {
+          const na = (a.product?.name || "").toLowerCase();
+          const nb = (b.product?.name || "").toLowerCase();
+          return na.localeCompare(nb);
+        });
+        break;
+      case "deals":
+        list.sort((a, b) => {
+          const offersA = (a.product?.offers || []).length;
+          const offersB = (b.product?.offers || []).length;
+          return offersB - offersA;
+        });
+        break;
+      case "relevance":
+      default:
+        list.sort((a, b) => (a.rank || 0) - (b.rank || 0));
+        break;
+    }
+
+    return list;
+  }, [
+    recommendations,
+    inStockOnly,
+    dealsOnly,
+    selectedBrands,
+    selectedMerchants,
+    priceRange,
+    sortOption,
+  ]);
 
   // Sync Supabase conversations when user logs in
   useEffect(() => {
@@ -356,13 +538,53 @@ function ProductsView() {
     }
   }
 
+  const displayTurn = useCallback((turn) => {
+    if (!turn) return;
+    setActiveTurnId(turn.id);
+    const restoredQuery = turn.query || "";
+
+    const key = `${restoredQuery}::noimg`;
+    lastExecutedKeyRef.current = key;
+    setPrevUrlQuery(restoredQuery);
+    setQuery(restoredQuery);
+    setUploadedImagePreview(null);
+
+    setRecommendations(turn.recommendations || []);
+    setIntent(turn.intent || null);
+    setNotice(turn.notice || "");
+    setError("");
+    setSearchComplete(
+      turn.status !== "error" || (turn.recommendations || []).length > 0,
+    );
+
+    const restoredOffers = {};
+    (turn.recommendations || []).forEach((recommendation) => {
+      const productId = recommendation.product?.productId;
+      if (!productId) return;
+      const offers = getOffers(recommendation);
+      const selectedIndex = offers.findIndex(
+        (offer) =>
+          offer.productUrl === recommendation.selectedOffer?.productUrl,
+      );
+      restoredOffers[productId] = selectedIndex >= 0 ? selectedIndex : 0;
+    });
+    setSelectedOffers(restoredOffers);
+
+    if (typeof window !== "undefined") {
+      const newUrl = restoredQuery
+        ? `/products?q=${encodeURIComponent(restoredQuery)}`
+        : "/products";
+      window.history.replaceState(null, "", newUrl);
+    }
+  }, []);
+
   function handleOpenConversation(conversationId, turnId) {
     const conversation = conversations.find(
       (item) => item.id === conversationId,
     );
     if (!conversation) return;
     const turns = Array.isArray(conversation.turns) ? conversation.turns : [];
-    const latestTurn =
+    const targetTurn =
       turns.find((turn) => turn.id === turnId) || turns[turns.length - 1];
 
     saveActiveConversationId(conversationId);
@@ -371,47 +593,64 @@ function ProductsView() {
       sessionStorage.removeItem("quickown_search_image");
     } catch {}
 
-    if (latestTurn) {
-      const restoredQuery = latestTurn.query || "";
-      setQuery(restoredQuery);
-      setRecommendations(latestTurn.recommendations || []);
-      setIntent(latestTurn.intent || null);
-      setNotice(latestTurn.notice || "");
-      setError(latestTurn.error || "");
-      setSearchComplete(
-        latestTurn.status !== "error" ||
-          (latestTurn.recommendations || []).length > 0,
-      );
-      const restoredOffers = {};
-      (latestTurn.recommendations || []).forEach((recommendation) => {
-        const productId = recommendation.product?.productId;
-        if (!productId) return;
-        const offers = getOffers(recommendation);
-        const selectedIndex = offers.findIndex(
-          (offer) =>
-            offer.productUrl === recommendation.selectedOffer?.productUrl,
-        );
-        restoredOffers[productId] = selectedIndex >= 0 ? selectedIndex : 0;
-      });
-      setSelectedOffers(restoredOffers);
-      lastExecutedKeyRef.current = `${restoredQuery}::noimg`;
-      router.replace(
-        restoredQuery
-          ? `/products?q=${encodeURIComponent(restoredQuery)}`
-          : "/products",
-        { scroll: false },
-      );
+    if (targetTurn) {
+      displayTurn(targetTurn);
     } else {
+      setActiveTurnId(null);
       setQuery("");
+      setPrevUrlQuery("");
       setRecommendations([]);
       setIntent(null);
       setNotice("");
       setError("");
       setSearchComplete(false);
       lastExecutedKeyRef.current = "::noimg";
-      router.replace("/products", { scroll: false });
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", "/products");
+      }
     }
   }
+
+  // Active conversation's turns (history within the single conversation)
+  const currentConversation = useMemo(
+    () => conversations.find((item) => item.id === activeConversationId) || null,
+    [conversations, activeConversationId],
+  );
+
+  const currentTurns = useMemo(() => {
+    return Array.isArray(currentConversation?.turns)
+      ? currentConversation.turns
+      : [];
+  }, [currentConversation]);
+
+  const currentTurnIndex = useMemo(() => {
+    if (!currentTurns || currentTurns.length === 0) return -1;
+    if (activeTurnId) {
+      const idx = currentTurns.findIndex((t) => t.id === activeTurnId);
+      if (idx !== -1) return idx;
+    }
+    return currentTurns.length - 1;
+  }, [currentTurns, activeTurnId]);
+
+  const prevTurn =
+    currentTurnIndex > 0 ? currentTurns[currentTurnIndex - 1] : null;
+
+  const nextTurn =
+    currentTurnIndex >= 0 && currentTurnIndex < currentTurns.length - 1
+      ? currentTurns[currentTurnIndex + 1]
+      : null;
+
+  const handlePrevTurn = useCallback(() => {
+    if (prevTurn) {
+      displayTurn(prevTurn);
+    }
+  }, [prevTurn, displayTurn]);
+
+  const handleNextTurn = useCallback(() => {
+    if (nextTurn) {
+      displayTurn(nextTurn);
+    }
+  }, [nextTurn, displayTurn]);
 
   // Close handler with slide down animation
   const handleClose = useCallback(() => {
@@ -444,6 +683,7 @@ function ProductsView() {
     setError("");
     setSearching(false);
     setSearchComplete(false);
+    setActiveTurnId(null);
 
     // 4. Mark execution key as clean so nothing auto-searches
     lastExecutedKeyRef.current = "::noimg";
@@ -622,6 +862,7 @@ function ProductsView() {
       setRecommendations([]);
       setIntent(null);
       setSearchComplete(false);
+      setActiveTurnId(null);
 
       try {
         const headers = { "Content-Type": "application/json" };
@@ -1008,24 +1249,22 @@ function ProductsView() {
               <button
                 type="button"
                 onClick={handleNewConversation}
-                title="Start a new conversation"
-                aria-label="New conversation"
-                className="inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all shadow-2xs cursor-pointer active:scale-95"
+                title="Start new conversation"
+                aria-label="Start new conversation"
+                className="inline-flex items-center justify-center w-9 h-9 text-white bg-zinc-950 hover:bg-zinc-800 border border-zinc-950 transition-all cursor-pointer shadow-2xs active:scale-95"
               >
-                <MessageSquarePlus className="w-4 h-4 text-zinc-600" />
-                <span className="hidden lg:inline">New</span>
+                <Plus className="w-4 h-4" />
               </button>
               <button
                 type="button"
                 onClick={() => setIsHistoryOpen(true)}
                 title="Open saved shopping conversations"
                 aria-label="Conversation history"
-                className="relative inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-cal font-medium text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all cursor-pointer"
+                className="relative inline-flex items-center justify-center w-9 h-9 text-zinc-700 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-all cursor-pointer shadow-2xs active:scale-95"
               >
                 <History className="w-4 h-4" />
-                <span className="hidden lg:inline">History</span>
                 {conversations.length > 0 && (
-                  <span className="text-[10px] font-bold text-emerald-700">
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">
                     {conversations.length}
                   </span>
                 )}
@@ -1062,20 +1301,44 @@ function ProductsView() {
           </div>
         </header>
 
+        {/* Filters & Sorting Panel (directly under Search Bar) */}
+        {!searching && recommendations.length > 0 && (
+          <ProductFilterSortBar
+            totalProducts={recommendations.length}
+            filteredCount={filteredAndSortedRecommendations.length}
+            availableBrands={availableBrands}
+            availableMerchants={availableMerchants}
+            sortOption={sortOption}
+            onSortChange={setSortOption}
+            priceRange={priceRange}
+            onPriceChange={setPriceRange}
+            selectedBrands={selectedBrands}
+            onToggleBrand={handleToggleBrand}
+            selectedMerchants={selectedMerchants}
+            onToggleMerchant={handleToggleMerchant}
+            inStockOnly={inStockOnly}
+            onToggleInStock={() => setInStockOnly((v) => !v)}
+            dealsOnly={dealsOnly}
+            onToggleDeals={() => setDealsOnly((v) => !v)}
+            onResetFilters={handleResetFilters}
+          />
+        )}
+
         {/* Error Banner */}
         {error && (
           <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 mt-4">
-            <div className="p-4 rounded-none bg-rose-500/10 border border-rose-500/30 text-rose-700 flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
+            <div className="p-3 sm:p-4 rounded-none bg-rose-500/10 border border-rose-500/30 text-rose-700 flex items-center justify-between gap-3 text-xs sm:text-sm">
+              <div className="flex items-center gap-2 min-w-0">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>{error}</span>
+                <span className="truncate sm:whitespace-normal">{error}</span>
               </div>
               <button
+                type="button"
                 onClick={() => setError("")}
-                className="text-rose-700 font-bold px-2 cursor-pointer"
+                className="text-rose-700 hover:text-rose-950 p-1 cursor-pointer transition-colors shrink-0"
                 aria-label="Dismiss error"
               >
-                ×
+                <X className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -1084,8 +1347,16 @@ function ProductsView() {
         {/* Notice Banner */}
         {notice && !searching && (
           <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 mt-4">
-            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm">
-              {notice}
+            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm flex items-center justify-between gap-3">
+              <span>{notice}</span>
+              <button
+                type="button"
+                onClick={() => setNotice("")}
+                className="text-amber-800 hover:text-amber-950 p-1 cursor-pointer transition-colors shrink-0"
+                aria-label="Dismiss notification"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
@@ -1103,7 +1374,7 @@ function ProductsView() {
           {!searching && searchComplete && (
             <div className="max-w-6xl mx-auto">
               <ProductResultsSection
-                recommendations={recommendations}
+                recommendations={filteredAndSortedRecommendations}
                 intent={intent}
                 query={query}
                 setQuery={setQuery}
@@ -1122,6 +1393,12 @@ function ProductsView() {
                   setDetailVariantIndex(swatchIdx || 0);
                 }}
                 onNewConversation={handleNewConversation}
+                onPrevTurn={handlePrevTurn}
+                onNextTurn={handleNextTurn}
+                hasPrevTurn={Boolean(prevTurn)}
+                hasNextTurn={Boolean(nextTurn)}
+                prevTurnQuery={prevTurn?.query || ""}
+                nextTurnQuery={nextTurn?.query || ""}
               />
             </div>
           )}
@@ -1141,7 +1418,7 @@ function ProductsView() {
                 duration={0.8}
                 rotate={true}
               >
-                Start a New Shopping Conversation
+                Search Products
               </GsapTextReveal>
 
               <div className="flex flex-wrap items-center justify-center gap-2">
