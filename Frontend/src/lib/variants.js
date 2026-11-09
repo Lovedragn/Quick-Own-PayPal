@@ -457,8 +457,9 @@ export function normalizeOffer(offer) {
   const merchant =
     offer.merchant ||
     offer.merchant_name ||
-    offer.domain ||
+    offer.merchantDomain ||
     offer.merchant_domain ||
+    offer.domain ||
     offer.merchant?.name ||
     offer.merchant?.domain ||
     (offer.url ? getDomainFromUrl(offer.url) : null) ||

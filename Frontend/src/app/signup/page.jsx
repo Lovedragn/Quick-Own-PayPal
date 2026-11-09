@@ -12,11 +12,6 @@ import GsapTextReveal from "@/components/ui/GsapTextReveal";
 import { signUpWithPassword, isSupabaseConfigured } from "@/lib/supabase";
 import "../auth.css";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.API_BASE_URL ||
-  "http://localhost:8080";
-
 export default function SignupPage() {
   const router = useRouter();
 
@@ -45,7 +40,7 @@ export default function SignupPage() {
     try {
       if (!isSupabaseConfigured) {
         throw new Error(
-          "Supabase publishable key missing! Put NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in frontend/.env.local and restart dev server."
+          "Supabase publishable key is missing or invalid. Copy the complete Publishable key (sb_publishable_...) or legacy anon key from Supabase Project Settings → API Keys into NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in the Frontend Dev run configuration, then restart the frontend."
         );
       }
       const { data, error: authError } = await signUpWithPassword(email, password);

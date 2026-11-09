@@ -303,6 +303,138 @@ class CheckoutServiceTest {
   }
 
   @Test
+  void usesSoleCurrentMerchantOfferWhenChannel3RefreshesTheSelectedUrl() {
+    ProductCatalogService refreshedCatalog =
+        new ProductCatalogService(new Channel3CatalogClient("test-channel3-key", baseUrl)) {
+          @Override
+          public com.quickown.backend.dto.product.ProductResult findById(String productId) {
+            return new com.quickown.backend.dto.product.ProductResult(
+                "Channel3",
+                "channel3-bose-001",
+                "Bose QC Earbuds",
+                "Bose",
+                "Earbuds",
+                "Wireless noise cancelling earbuds",
+                "https://images.example/bose-qc.jpg",
+                true,
+                List.of(
+                    new com.quickown.backend.dto.product.ProductOffer(
+                        "shop.example.com",
+                        new java.math.BigDecimal("179.00"),
+                        "USD",
+                        "InStock",
+                        "https://shop.example.com/bose-qc?aid=current")),
+                null,
+                List.of());
+          }
+        };
+
+    CheckoutService refreshedCheckout =
+        new CheckoutService(
+            refreshedCatalog,
+            paypalOrdersClient,
+            "Quick-Own Test",
+            "http://localhost:3000/checkout/success",
+            "http://localhost:3000/checkout/cancel",
+            tempDir.resolve("checkout-refreshed-offer.json"));
+
+    var request =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem(
+                    "channel3-bose-001",
+                    "Bose QC Earbuds",
+                    "shop.example.com",
+                    1,
+                    "https://shop.example.com/old-redirect?aid=previous")));
+
+    var created = refreshedCheckout.createOrder(request, "checkout-refreshed-offer");
+
+    assertEquals("179.00", created.total());
+    assertEquals("USD", created.currency());
+    assertEquals(1, paypalCreateCalls.get());
+  }
+
+  @Test
+  void refreshesOffersWhenProductDetailOmitsThemAndMatchesCanonicalMerchantDomain() {
+    var detailWithoutOffers =
+        new com.quickown.backend.dto.product.ProductResult(
+            "Channel3",
+            "channel3-bose-001",
+            "Bose QC Earbuds",
+            "Bose",
+            "Earbuds",
+            "Wireless noise cancelling earbuds",
+            "https://images.example/bose-qc.jpg",
+            true,
+            List.of(),
+            null,
+            List.of());
+    var refreshedProduct =
+        new com.quickown.backend.dto.product.ProductResult(
+            "Channel3",
+            "channel3-bose-001",
+            "Bose QC Earbuds",
+            "Bose",
+            "Earbuds",
+            "Wireless noise cancelling earbuds",
+            "https://images.example/bose-qc.jpg",
+            true,
+            List.of(
+                new com.quickown.backend.dto.product.ProductOffer(
+                    "Amazon",
+                    new java.math.BigDecimal("179.00"),
+                    "USD",
+                    "InStock",
+                    "https://www.amazon.com/bose-qc?aid=current")),
+            null,
+            List.of());
+    AtomicInteger refreshedSearchCalls = new AtomicInteger();
+    ProductCatalogService refreshedCatalog =
+        new ProductCatalogService(new Channel3CatalogClient("test-channel3-key", baseUrl)) {
+          @Override
+          public com.quickown.backend.dto.product.ProductResult findById(String productId) {
+            return detailWithoutOffers;
+          }
+
+          @Override
+          public List<com.quickown.backend.dto.product.ProductResult> search(
+              String query, boolean inStockOnly, String currency) {
+            refreshedSearchCalls.incrementAndGet();
+            assertEquals("Bose QC Earbuds", query);
+            assertEquals(true, inStockOnly);
+            assertEquals("ANY", currency);
+            return List.of(refreshedProduct);
+          }
+        };
+
+    CheckoutService refreshedCheckout =
+        new CheckoutService(
+            refreshedCatalog,
+            paypalOrdersClient,
+            "Quick-Own Test",
+            "http://localhost:3000/checkout/success",
+            "http://localhost:3000/checkout/cancel",
+            tempDir.resolve("checkout-detail-without-offers.json"));
+    var request =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem(
+                    "channel3-bose-001",
+                    "Bose QC Earbuds",
+                    "www.amazon.com",
+                    1,
+                    "https://www.amazon.com/old-product-link?aid=previous")));
+
+    var created = refreshedCheckout.createOrder(request, "checkout-detail-without-offers");
+
+    assertEquals("179.00", created.total());
+    assertEquals("USD", created.currency());
+    assertEquals(1, refreshedSearchCalls.get());
+    assertEquals(1, paypalCreateCalls.get());
+  }
+
+  @Test
   void requiresSelectedOfferUrlWhenMerchantHasMultipleEligibleOffers() {
     ProductCatalogService multiOfferCatalog =
         new ProductCatalogService(
@@ -354,6 +486,22 @@ class CheckoutServiceTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> multiOfferCheckout.createOrder(ambiguousRequest, "checkout-ambiguous-offer"));
+    assertEquals(0, paypalCreateCalls.get());
+
+    var staleAmbiguousRequest =
+        new CheckoutRequest(
+            List.of(
+                new CheckoutItem(
+                    "channel3-bose-001",
+                    "Bose QC Earbuds",
+                    "shop.example.com",
+                    1,
+                    "https://shop.example.com/removed-offer?aid=old")));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            multiOfferCheckout.createOrder(
+                staleAmbiguousRequest, "checkout-stale-ambiguous-offer"));
     assertEquals(0, paypalCreateCalls.get());
 
     var selectedRequest =

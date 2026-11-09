@@ -23,10 +23,21 @@ Next.js customer experience for the Quick-Own AI shopping agent.
 Create `.env.local` in this directory:
 
 ```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_COMPLETE_KEY
 API_BASE_URL=http://localhost:8080
 ```
 
-This value is a public backend URL, not a secret. Never expose Gemini, Channel3 or PayPal secrets through `NEXT_PUBLIC_*` variables.
+Use the complete Supabase Publishable key from **Project Settings → API Keys** (or the legacy anon JWT key). A truncated prefix or placeholder is not a valid key. Never use a Supabase secret/service-role key in a `NEXT_PUBLIC_*` variable, and never expose Gemini, Channel3 or PayPal secrets to the browser.
+
+### Google OAuth setup
+
+1. In Supabase **Authentication → Providers → Google**, enable Google and configure the Google OAuth client ID and client secret.
+2. In Supabase **Authentication → URL Configuration**, set the local Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to the Redirect URLs allowlist.
+3. In Google Cloud, set the Authorized redirect URI to `https://YOUR_PROJECT.supabase.co/auth/v1/callback` (the Supabase callback, not the frontend callback).
+4. Restart the frontend after changing its environment variables.
+
+QuickOwn uses the PKCE flow. Google and email-confirmation links return to `/auth/callback`, which exchanges the one-time authorization code, verifies that a Supabase session exists, and only then redirects into the app.
 
 ## Run
 

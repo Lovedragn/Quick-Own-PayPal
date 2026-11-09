@@ -25,6 +25,8 @@ import {
   createStoredLikedProduct,
 } from "@/lib/storage";
 import { useSavedProductHydration } from "@/lib/useSavedProductHydration";
+import { useAuth } from "@/lib/useAuth";
+import { useSupabaseUserData } from "@/lib/useSupabaseUserData";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -70,6 +72,17 @@ export default function Home() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLikesOpen, setIsLikesOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
+  const { user } = useAuth();
+
+  useSupabaseUserData({
+    userId: user?.id,
+    likedIds,
+    saveLikes,
+    likedProductDetails,
+    saveLikedProductDetails,
+    orders,
+    saveOrders,
+  });
 
   useSavedProductHydration({
     likedIds,
