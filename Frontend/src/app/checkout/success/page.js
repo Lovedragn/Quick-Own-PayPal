@@ -12,7 +12,7 @@ import {
   saveStoredCart,
 } from "@/lib/storage";
 import { useAuth } from "@/lib/useAuth";
-import { saveRemoteOrder } from "@/lib/supabase";
+import { supabase, saveRemoteOrder, saveRemoteCart } from "@/lib/supabase";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -74,9 +74,12 @@ export default function CheckoutSuccessPage() {
         (o) => o.orderId === data.orderId || o.captureId === data.captureId,
       );
 
-      let orderToPersist = existingOrders.find(
-        (order) => order.orderId === data.orderId || order.captureId === data.captureId,
-      ) || null;
+      let orderToPersist =
+        existingOrders.find(
+          (order) =>
+            order.orderId === data.orderId ||
+            order.captureId === data.captureId,
+        ) || null;
 
       if (!isAlreadyRecorded) {
         const newOrder = {
@@ -111,15 +114,27 @@ export default function CheckoutSuccessPage() {
           }),
         };
         saveStoredOrders([newOrder, ...existingOrders]);
-        orderToPersist = newOrder;
-      }
-      if (orderToPersist) {
-        setPendingRemoteOrder(orderToPersist);
+
+        // Save order to Supabase
+        if (supabase) {
+          void supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) {
+              void saveRemoteOrder(user.id, newOrder);
+            }
+          });
+        }
       }
 
       // If checkout originated from Cart, empty cart
       if (pending?.source === "cart") {
         saveStoredCart([]);
+        if (supabase) {
+          void supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) {
+              void saveRemoteCart(user.id, []);
+            }
+          });
+        }
       }
       saveStoredPendingCheckout(null);
     } catch (error) {
