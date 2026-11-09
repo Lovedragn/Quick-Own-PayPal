@@ -412,26 +412,35 @@ public class CheckoutService {
                   .toList();
 
       ProductOffer offer;
-      if (requested.offerUrl() != null && !requested.offerUrl().isBlank()) {
-        offer =
-            merchantOffers.stream()
-                // Channel3 rotates its attribution "aid" parameter between searches.
-                // Keep the product path and offer identifier exact, but ignore that
-                // request-specific tracking parameter during server-side revalidation.
-                .filter(candidate -> sameOfferUrl(requested.offerUrl(), candidate.productUrl()))
-                .findFirst()
-                .orElseThrow(
-                    () ->
-                        new IllegalArgumentException(
-                            "The selected offer URL is no longer available for "
-                                + requested.productName()));
+      ProductOffer exactOffer =
+          requested.offerUrl() == null || requested.offerUrl().isBlank()
+              ? null
+              : merchantOffers.stream()
+                  // Ignore only Channel3's request-specific attribution parameter.
+                  // Merchant, product ID and all live price/stock checks remain authoritative.
+                  .filter(candidate -> sameOfferUrl(requested.offerUrl(), candidate.productUrl()))
+                  .findFirst()
+                  .orElse(null);
+
+      if (exactOffer != null) {
+        offer = exactOffer;
       } else if (merchantOffers.size() == 1) {
+        // Channel3 can rotate or refresh the retailer URL between search and checkout.
+        // When the selected product ID and merchant still resolve to exactly one eligible
+        // live offer, use that server-fetched offer and its current price/URL. Never guess
+        // when the selected merchant has more than one eligible offer.
         offer = merchantOffers.get(0);
+      } else if (merchantOffers.size() > 1 && requested.offerUrl() != null
+          && !requested.offerUrl().isBlank()) {
+        throw new IllegalArgumentException(
+            "The selected offer changed for "
+                + requested.productName()
+                + ". Refresh the product and select the retailer offer again.");
       } else if (merchantOffers.size() > 1) {
         throw new IllegalArgumentException(
             "This merchant has multiple eligible offers for "
                 + requested.productName()
-                + ". Send the exact selected offerUrl from the catalogue response.");
+                + ". Select an exact offer from the catalogue response.");
       } else {
         throw new IllegalArgumentException(
             "The selected merchant offer is unavailable or out of stock for "
