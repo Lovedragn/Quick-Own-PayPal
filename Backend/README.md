@@ -107,7 +107,7 @@ Content-Type: application/json
 }
 ```
 
-The client does not provide a price. The backend re-fetches the configured catalogue, validates product ID and title, the selected merchant and offer URL, stock and current price, then calculates the PayPal total. If a merchant has multiple eligible offers, `offerUrl` is required to identify the chosen price. All items in one PayPal order must use the same currency.
+The client does not provide a price. The backend re-fetches the configured catalogue, validates the product ID and selected merchant, checks stock and current price, then calculates the PayPal total. It uses the exact selected offer URL when it is still current. If Channel3 refreshes that URL and exactly one eligible live offer remains for the selected merchant and product, the backend uses that live offer and its current price. When multiple eligible offers remain for that merchant, an exact `offerUrl` match is required; ambiguous or stale selections are rejected and must be selected again. All items in one PayPal order must use the same currency.
 
 The backend returns the PayPal order ID and approval URL. The browser redirects the buyer to PayPal Sandbox. PayPal returns to the frontend success page, which calls `POST /api/checkout/orders/{orderId}/capture`. The backend verifies that the order is approved and that PayPal's amount and currency match the server-calculated total before capture.
 
