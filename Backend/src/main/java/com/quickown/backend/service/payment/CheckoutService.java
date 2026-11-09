@@ -378,6 +378,7 @@ public class CheckoutService {
       validateItem(requested);
 
       ProductResult product = null;
+      boolean productFetchedBySearch = false;
       if (requested.productId() != null && !requested.productId().isBlank()) {
         product = productCatalogService.findById(requested.productId());
       }
@@ -395,21 +396,39 @@ public class CheckoutService {
                     () ->
                         new IllegalArgumentException(
                             "Product is no longer available: " + requested.productName()));
+        productFetchedBySearch = true;
       }
 
-      List<ProductOffer> merchantOffers =
-          product.offers() == null
-              ? List.of()
-              : product.offers().stream()
+      List<ProductOffer> merchantOffers = eligibleOffersForMerchant(product, requested);
+
+      // The Channel3 product-detail endpoint can return product metadata without the current
+      // offer collection. Rehydrate the exact same product through live search before declaring
+      // the selected merchant unavailable; never switch product IDs or trust client prices.
+      if (merchantOffers.isEmpty()
+          && !productFetchedBySearch
+          && requested.productId() != null) {
+        try {
+          ProductResult refreshedProduct =
+              productCatalogService.search(requested.productName(), true, "ANY").stream()
+                  .filter(candidate -> requested.productId().equals(candidate.productId()))
                   .filter(
                       candidate ->
-                          candidate.merchant() != null
-                              && candidate
-                                  .merchant()
-                                  .equalsIgnoreCase(requested.merchantDomain().trim()))
-                  .filter(candidate -> isInStock(candidate.availability()))
-                  .filter(candidate -> candidate.price() != null && candidate.currency() != null)
-                  .toList();
+                          candidate.name().equalsIgnoreCase(requested.productName().trim()))
+                  .findFirst()
+                  .orElse(null);
+          if (refreshedProduct != null) {
+            List<ProductOffer> refreshedOffers =
+                eligibleOffersForMerchant(refreshedProduct, requested);
+            if (!refreshedOffers.isEmpty()) {
+              product = refreshedProduct;
+              merchantOffers = refreshedOffers;
+            }
+          }
+        } catch (RuntimeException ignored) {
+          // Keep the original server-validated product state and return the normal unavailable
+          // message below. A catalogue outage must not bypass checkout validation.
+        }
+      }
 
       ProductOffer offer;
       ProductOffer exactOffer =
@@ -669,6 +688,56 @@ public class CheckoutService {
     return normalized.equals("instock")
         || normalized.equals("available")
         || normalized.equals("limitedavailability");
+  }
+
+  private List<ProductOffer> eligibleOffersForMerchant(
+      ProductResult product, CheckoutItem requested) {
+    if (product == null || product.offers() == null) {
+      return List.of();
+    }
+    return product.offers().stream()
+        .filter(candidate -> sameMerchant(requested.merchantDomain(), candidate))
+        .filter(candidate -> isInStock(candidate.availability()))
+        .filter(candidate -> candidate.price() != null && candidate.currency() != null)
+        .toList();
+  }
+
+  /**
+   * Match the selected retailer by its canonical host when one side includes www or a URL scheme.
+   * The retailer URL host is also checked because provider detail and search responses can differ
+   * in whether they return a bare merchant name or its domain.
+   */
+  private boolean sameMerchant(String requestedMerchant, ProductOffer candidate) {
+    String requested = merchantKey(requestedMerchant);
+    if (requested == null) {
+      return false;
+    }
+
+    String candidateMerchant = merchantKey(candidate.merchant());
+    if (requested.equals(candidateMerchant)) {
+      return true;
+    }
+
+    String offerHost = merchantKey(candidate.productUrl());
+    return requested.equals(offerHost);
+  }
+
+  private String merchantKey(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    String trimmed = value.trim();
+    try {
+      URI uri = URI.create(
+          trimmed.contains("://") ? trimmed : "https://" + trimmed);
+      String host = uri.getHost();
+      if (host != null && !host.isBlank()) {
+        return host.toLowerCase(Locale.ROOT).replaceFirst("^www\\.", "");
+      }
+    } catch (IllegalArgumentException ignored) {
+      // Some catalogue providers return a merchant label rather than a domain.
+    }
+    return trimmed.toLowerCase(Locale.ROOT).replaceFirst("^www\\.", "").replaceAll("/+$", "");
   }
 
   private boolean sameOfferUrl(String requestedUrl, String currentUrl) {
