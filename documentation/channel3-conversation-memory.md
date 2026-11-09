@@ -25,7 +25,17 @@ Cart state, temporary search input, and UI-only state are not part of the user-d
 
 ## Existing Channel3 conversations
 
-For a Supabase conversation created before the Channel3 thread ID was stored, the server reads the saved turns once and supplies them as initial Channel3 conversation context when the new Channel3 thread is created. After that first turn, follow-up context is managed by Channel3 using its own conversation ID.
+For a Supabase conversation created before the Channel3 thread ID was stored, the server reads the **latest 12 successful turns** from `conversation_turns`, restores them to chronological order, and supplies them as initial `context.user_context` when the new Channel3 thread is created. This preserves the most recent budgets, preferences, refinements, assistant responses, and products rather than seeding an old slice of the transcript. After that first turn, follow-up context is managed by Channel3 using its own conversation ID.
+
+## Turn lifecycle
+
+1. The signed-in browser sends the current Supabase access token and local History conversation ID to the Next.js server route.
+2. The server validates the token with Supabase, loads that user's conversation row and saved turns, and reads its `channel3_conversation_id` mapping.
+3. If a Channel3 thread ID exists, the server sends the new user message with that `conversation_id`; Channel3 loads the server-side transcript and continues the same thread.
+4. If the Supabase conversation predates Channel3 mapping, the server sends the latest saved transcript as pinned initial context and lets Channel3 create a new thread.
+5. The server saves the returned ID from `turn.started` back to the same Supabase conversation row, then stores the completed user turn, assistant response, and product snapshots in `conversation_turns`.
+
+The Channel3 API key remains server-side. Supabase requests use the signed-in user's access token and existing Row Level Security policies. The browser never chooses the authenticated user's Channel3 thread ID; the server resolves it from the user's own Supabase row.
 
 ## Supabase migration
 

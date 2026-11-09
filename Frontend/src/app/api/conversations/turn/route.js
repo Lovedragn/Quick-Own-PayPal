@@ -218,7 +218,8 @@ export async function POST(request) {
         .select("query,recommendations,status,assistant_message")
         .eq("conversation_id", localConversationId)
         .eq("user_id", user.id)
-        .order("created_at", { ascending: true })
+        // Fetch the latest turns first so the limit does not discard recent context.
+        .order("created_at", { ascending: false })
         .limit(12);
 
       if (turnsError) {
@@ -227,7 +228,8 @@ export async function POST(request) {
           500,
         );
       }
-      previousTurns = turns || [];
+      // Restore chronological order before seeding Channel3's new server-side thread.
+      previousTurns = (turns || []).reverse();
     } else {
       previousTurns = Array.isArray(body.previousTurns)
         ? body.previousTurns.slice(-12)
