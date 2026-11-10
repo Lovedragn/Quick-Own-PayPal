@@ -42,6 +42,10 @@ import {
   createStoredLikedProduct,
 } from "@/lib/storage";
 import { extractNormalizedOffers } from "@/lib/variants";
+import {
+  CHANNEL3_SEARCH_PAGE_SIZE,
+  mergeUniqueRecommendations,
+} from "@/lib/channel3-products";
 import { useAuth } from "@/lib/useAuth";
 import {
   fetchRemoteConversations,
@@ -140,6 +144,14 @@ function ProductsView() {
   const [detailProduct, setDetailProduct] = useState(null);
   const [detailVariantIndex, setDetailVariantIndex] = useState(0);
   const [activeTurnId, setActiveTurnId] = useState(null);
+  const [nextPageToken, setNextPageToken] = useState(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState("");
+  const [paginationQuery, setPaginationQuery] = useState("");
+  const [paginationImageData, setPaginationImageData] = useState("");
+  const [paginationConversationId, setPaginationConversationId] = useState(null);
+  const loadingMoreRef = useRef(null);
+  const searchGenerationRef = useRef(0);
   const checkoutAttemptRef = useRef(null);
   const lastExecutedKeyRef = useRef("");
 
@@ -407,7 +419,7 @@ function ProductsView() {
       }
 
       const recommendations = (turnData.recommendations || [])
-        .slice(0, 8)
+        .slice(0, CHANNEL3_SEARCH_PAGE_SIZE)
         .map((recommendation) => {
           const product = recommendation?.product || {};
           return {
@@ -486,6 +498,36 @@ function ProductsView() {
     ],
   );
 
+  const appendProductsToConversationTurn = useCallback(
+    (conversationId, appendedRecommendations) => {
+      if (!conversationId || !Array.isArray(appendedRecommendations) || appendedRecommendations.length === 0) {
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const updatedConversations = conversations.map((conversation) => {
+        if (conversation.id !== conversationId) return conversation;
+        const turns = Array.isArray(conversation.turns) ? [...conversation.turns] : [];
+        if (turns.length === 0) return conversation;
+
+        const lastIndex = turns.length - 1;
+        const lastTurn = turns[lastIndex];
+        const mergedRecommendations = mergeUniqueRecommendations(
+          lastTurn.recommendations || [],
+          appendedRecommendations,
+        );
+        turns[lastIndex] = {
+          ...lastTurn,
+          recommendations: mergedRecommendations,
+          resultCount: mergedRecommendations.length,
+        };
+        return { ...conversation, turns, updatedAt: now };
+      });
+      saveConversations(updatedConversations);
+    },
+    [conversations, saveConversations],
+  );
+
   function handleRenameConversation(conversationId, title) {
     const cleanTitle = title.slice(0, 64);
     const updated = conversations.map((conversation) =>
@@ -510,6 +552,14 @@ function ProductsView() {
       deleteRemoteConversation(conversationId, user.id);
     }
     if (activeConversationId === conversationId) {
+      searchGenerationRef.current += 1;
+      loadingMoreRef.current = null;
+      setNextPageToken(null);
+      setIsLoadingMore(false);
+      setLoadMoreError("");
+      setPaginationQuery("");
+      setPaginationImageData("");
+      setPaginationConversationId(null);
       saveActiveConversationId(null);
       setQuery("");
       setRecommendations([]);
@@ -523,6 +573,14 @@ function ProductsView() {
   }
 
   function handleClearHistory() {
+    searchGenerationRef.current += 1;
+    loadingMoreRef.current = null;
+    setNextPageToken(null);
+    setIsLoadingMore(false);
+    setLoadMoreError("");
+    setPaginationQuery("");
+    setPaginationImageData("");
+    setPaginationConversationId(null);
     saveConversations([]);
     saveActiveConversationId(null);
     setQuery("");
@@ -540,6 +598,14 @@ function ProductsView() {
 
   const displayTurn = useCallback((turn) => {
     if (!turn) return;
+    searchGenerationRef.current += 1;
+    loadingMoreRef.current = null;
+    setNextPageToken(null);
+    setIsLoadingMore(false);
+    setLoadMoreError("");
+    setPaginationQuery("");
+    setPaginationImageData("");
+    setPaginationConversationId(null);
     setActiveTurnId(turn.id);
     const restoredQuery = turn.query || "";
 
@@ -665,6 +731,14 @@ function ProductsView() {
   // Start a fresh product conversation
   const handleNewConversation = useCallback(() => {
     createConversation();
+    searchGenerationRef.current += 1;
+    loadingMoreRef.current = null;
+    setNextPageToken(null);
+    setIsLoadingMore(false);
+    setLoadMoreError("");
+    setPaginationQuery("");
+    setPaginationImageData("");
+    setPaginationConversationId(null);
 
     // 1. Reset query & sync tracker
     setQuery("");
@@ -856,6 +930,16 @@ function ProductsView() {
           ? currentConversation.title
           : (activeText || "Image search").slice(0, 52);
 
+      const searchGeneration = searchGenerationRef.current + 1;
+      searchGenerationRef.current = searchGeneration;
+      loadingMoreRef.current = null;
+      setNextPageToken(null);
+      setIsLoadingMore(false);
+      setLoadMoreError("");
+      setPaginationQuery(activeText);
+      setPaginationImageData(activeImage || "");
+      setPaginationConversationId(localConversationId);
+
       setSearching(true);
       setError("");
       setNotice("");
@@ -894,6 +978,8 @@ function ProductsView() {
           ? data.recommendations
           : [];
         setRecommendations(results);
+        setNextPageToken(data.nextPageToken || null);
+        setLoadMoreError("");
         setIntent(data.intent || null);
         setNotice(data.notice || "");
         setSearchComplete(true);
@@ -931,6 +1017,8 @@ function ProductsView() {
         const message =
           requestError.message ||
           "Could not reach Channel3. Please check the server configuration and retry.";
+        setNextPageToken(null);
+        setLoadMoreError("");
         setError(message);
         persistConversationTurn(
           {
@@ -961,6 +1049,103 @@ function ProductsView() {
       persistConversationTurn,
     ],
   );
+
+  const loadMoreProducts = useCallback(async () => {
+    if (!nextPageToken || loadingMoreRef.current) return;
+
+    const requestMarker = {};
+    loadingMoreRef.current = requestMarker;
+    const requestGeneration = searchGenerationRef.current;
+    const requestedToken = nextPageToken;
+    setIsLoadingMore(true);
+    setLoadMoreError("");
+
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+
+      const response = await fetch("/api/products/search/page", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          query: paginationQuery,
+          imageData: paginationImageData || undefined,
+          pageToken: requestedToken,
+          localConversationId: paginationConversationId,
+          limit: CHANNEL3_SEARCH_PAGE_SIZE,
+        }),
+      });
+      const data = await readApiResponse(response);
+      if (!data.success) {
+        throw new Error(data.error || "Channel3 could not load more products.");
+      }
+      if (requestGeneration !== searchGenerationRef.current) return;
+
+      const incoming = Array.isArray(data.recommendations)
+        ? data.recommendations
+        : [];
+      const merged = mergeUniqueRecommendations(recommendations, incoming);
+      const appended = merged.slice(recommendations.length);
+
+      if (appended.length > 0) {
+        setRecommendations(merged);
+
+        setSelectedOffers((current) => {
+          const updated = { ...current };
+          appended.forEach((recommendation) => {
+            const productId = recommendation.product?.productId;
+            if (productId && updated[productId] === undefined) {
+              updated[productId] = 0;
+            }
+          });
+          return updated;
+        });
+
+        const updatedQuantities = { ...quantities };
+        appended.forEach((recommendation) => {
+          const productId = recommendation.product?.productId;
+          if (productId && !updatedQuantities[productId]) {
+            updatedQuantities[productId] = 1;
+          }
+        });
+        saveQuantities(updatedQuantities);
+        appendProductsToConversationTurn(
+          paginationConversationId,
+          appended,
+        );
+      }
+
+      const returnedToken = data.nextPageToken || null;
+      setNextPageToken(
+        returnedToken && returnedToken !== requestedToken
+          ? returnedToken
+          : null,
+      );
+    } catch (requestError) {
+      if (requestGeneration === searchGenerationRef.current) {
+        setLoadMoreError(
+          requestError.message || "Could not load more products. Please retry.",
+        );
+      }
+    } finally {
+      if (loadingMoreRef.current === requestMarker) {
+        loadingMoreRef.current = null;
+        setIsLoadingMore(false);
+      }
+    }
+  }, [
+    nextPageToken,
+    accessToken,
+    paginationQuery,
+    paginationImageData,
+    paginationConversationId,
+    recommendations,
+    quantities,
+    saveQuantities,
+    appendProductsToConversationTurn,
+  ]);
 
   // Trigger search on mount or when urlQuery / image source changes
   useEffect(() => {
@@ -1399,6 +1584,10 @@ function ProductsView() {
                 hasNextTurn={Boolean(nextTurn)}
                 prevTurnQuery={prevTurn?.query || ""}
                 nextTurnQuery={nextTurn?.query || ""}
+                hasMoreProducts={Boolean(nextPageToken)}
+                isLoadingMore={isLoadingMore}
+                loadMoreError={loadMoreError}
+                onLoadMore={loadMoreProducts}
               />
             </div>
           )}

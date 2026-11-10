@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { Channel3 } from "@channel3/sdk";
 import { createClient } from "@supabase/supabase-js";
+import {
+  CHANNEL3_SEARCH_PAGE_SIZE,
+  normalizeChannel3ImageData,
+  toChannel3Recommendation,
+} from "@/lib/channel3-products";
 
 const channel3ApiKey =
   process.env.CHANNELV3_SECRET || process.env.CHANNEL3_API_KEY || "";
@@ -82,51 +87,6 @@ function extractProductsFromParts(parts, target) {
       if (product?.id && product?.title) target.set(product.id, product);
     }
   }
-}
-
-function toRecommendation(product, index, assistantText) {
-  const rawOffers = Array.isArray(product.offers) ? product.offers : [];
-  const offers = rawOffers.map((offer) => ({
-    merchantDomain: offer.domain || "Store",
-    price: offer.price || null,
-    currency: offer.price?.currency || "USD",
-    productUrl: offer.url || "",
-    availability: offer.availability || "InStock",
-    inStock: offer.availability !== "OutOfStock",
-  }));
-  const selectedOffer = offers[0] || null;
-  const imageObjects = Array.isArray(product.images) ? product.images : [];
-  const imageUrl =
-    imageObjects.find((image) => image?.is_main_image)?.cleaned_url ||
-    imageObjects.find((image) => image?.cleaned_url)?.cleaned_url ||
-    imageObjects[0]?.url ||
-    "";
-  const matchedFeatures = Array.isArray(product.key_features)
-    ? product.key_features.slice(0, 8)
-    : [];
-
-  return {
-    rank: index + 1,
-    product: {
-      source: "CHANNEL3",
-      productId: product.id,
-      name: product.title || "Product",
-      brand: product.brands?.[0]?.name || "",
-      category: product.category?.title || product.category?.slug || "",
-      description: product.description || "",
-      imageUrl,
-      images: imageObjects,
-      inStock: offers.some((offer) => offer.inStock),
-      offers,
-      variants: product.variants || null,
-    },
-    selectedOffer,
-    matchedFeatureCount: matchedFeatures.length || 1,
-    matchedFeatures,
-    explanation:
-      assistantText ||
-      "Recommended from Channel3's live product catalogue.",
-  };
 }
 
 export async function POST(request) {
@@ -320,9 +280,40 @@ export async function POST(request) {
       throw new Error("Channel3 ended the stream before completing the conversation turn.");
     }
 
-    const rawProducts = Array.from(productsById.values()).slice(0, 10);
+    let rawProducts = Array.from(productsById.values()).slice(0, 10);
+    let nextPageToken = null;
+
+    // Initialize the visible grid from Channel3's paginated product-search API.
+    // The conversational agent still owns intent/refinement; this matching search
+    // establishes the cursor used for every scroll-triggered append.
+    try {
+      const catalogSearch = await channel3.products.search({
+        limit: CHANNEL3_SEARCH_PAGE_SIZE,
+        ...(message ? { query: message } : {}),
+        ...(imageData
+          ? { base64_image: normalizeChannel3ImageData(imageData) }
+          : {}),
+        ...(user ? { "x-user-id": user.id } : {}),
+      });
+      if (Array.isArray(catalogSearch.data) && catalogSearch.data.length > 0) {
+        rawProducts = catalogSearch.data;
+      }
+      nextPageToken =
+        typeof catalogSearch.response?.next_page_token === "string" &&
+        catalogSearch.response.next_page_token.length > 0
+          ? catalogSearch.response.next_page_token
+          : null;
+    } catch (paginationSetupError) {
+      // Keep the conversational tool results usable even when the separate
+      // catalogue cursor cannot be initialized for this turn.
+      console.warn(
+        "Could not initialize Channel3 product pagination:",
+        paginationSetupError?.message || paginationSetupError,
+      );
+    }
+
     const recommendations = rawProducts.map((product, index) =>
-      toRecommendation(product, index, assistantText),
+      toChannel3Recommendation(product, index, assistantText),
     );
     const intent = {
       intentSummary: "Channel3 conversational product search",
@@ -375,6 +366,7 @@ export async function POST(request) {
       channel3ConversationId,
       assistantMessage: assistantText,
       recommendations,
+      nextPageToken,
       intent,
       notice,
     });
