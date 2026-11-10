@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   ArrowUpRight,
   ChevronLeft,
   ChevronRight,
+  Loader2,
   MessageSquarePlus,
   Sparkles,
 } from "lucide-react";
@@ -49,7 +51,48 @@ export default function ProductResultsSection({
   hasNextConversation = false,
   prevConversationTitle = "",
   nextConversationTitle = "",
+  hasMoreProducts = false,
+  isLoadingMore = false,
+  loadMoreError = "",
+  onLoadMore,
 }) {
+  const loadMoreSentinelRef = useRef(null);
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (
+      !sentinel ||
+      !hasMoreProducts ||
+      isLoadingMore ||
+      loadMoreError ||
+      typeof IntersectionObserver === "undefined" ||
+      !onLoadMore
+    ) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          onLoadMore();
+        }
+      },
+      {
+        root: null,
+        rootMargin: "700px 0px",
+        threshold: 0,
+      },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [
+    hasMoreProducts,
+    isLoadingMore,
+    loadMoreError,
+    onLoadMore,
+    recommendations.length,
+  ]);
+
   const handlePrev = onPrevTurn || onPrevConversation;
   const handleNext = onNextTurn || onNextConversation;
   const canPrev = hasPrevTurn || hasPrevConversation;
@@ -177,6 +220,43 @@ export default function ProductResultsSection({
           );
         })}
       </div>
+
+      {/* Automatically append the next Channel3 cursor page as the shopper scrolls. */}
+      {(hasMoreProducts || isLoadingMore || loadMoreError) && (
+        <div
+          ref={loadMoreSentinelRef}
+          className="flex min-h-16 flex-col items-center justify-center gap-2 py-6 text-center"
+          aria-live="polite"
+        >
+          {isLoadingMore ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+              <span className="text-xs text-zinc-500">Loading more products…</span>
+            </>
+          ) : loadMoreError ? (
+            <>
+              <span className="text-xs text-rose-600">{loadMoreError}</span>
+              <button
+                type="button"
+                onClick={onLoadMore}
+                className="border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50"
+              >
+                Retry loading products
+              </button>
+            </>
+          ) : (
+            <span className="text-[11px] text-zinc-400">
+              Scroll to discover more products
+            </span>
+          )}
+        </div>
+      )}
+
+      {!hasMoreProducts && !isLoadingMore && recommendations.length > 0 && (
+        <p className="py-5 text-center text-[11px] text-zinc-400">
+          You’ve reached the end of the available products.
+        </p>
+      )}
 
       {/* Channel3 Conversational Response */}
       <div className="mt-8 text-center max-w-2xl mx-auto">
