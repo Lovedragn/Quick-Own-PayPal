@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown, MessageSquarePlus, Sparkles } from "lucide-react";
+import {
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  MessageSquarePlus,
+  Sparkles,
+} from "lucide-react";
 import IconButton from "@/components/ui/icon-button";
 import ProductCard from "@/components/ProductCard";
 import GsapTextReveal from "@/components/ui/GsapTextReveal";
@@ -31,7 +37,25 @@ export default function ProductResultsSection({
   onAddToCart,
   onOpenDetail,
   onNewConversation,
+  onPrevTurn,
+  onNextTurn,
+  hasPrevTurn = false,
+  hasNextTurn = false,
+  prevTurnQuery = "",
+  nextTurnQuery = "",
+  onPrevConversation,
+  onNextConversation,
+  hasPrevConversation = false,
+  hasNextConversation = false,
+  prevConversationTitle = "",
+  nextConversationTitle = "",
 }) {
+  const handlePrev = onPrevTurn || onPrevConversation;
+  const handleNext = onNextTurn || onNextConversation;
+  const canPrev = hasPrevTurn || hasPrevConversation;
+  const canNext = hasNextTurn || hasNextConversation;
+  const prevLabel = prevTurnQuery || prevConversationTitle;
+  const nextLabel = nextTurnQuery || nextConversationTitle;
   if (recommendations.length === 0) {
     return (
       <div id="results" className="w-full mt-8 mb-12">
@@ -45,22 +69,8 @@ export default function ProductResultsSection({
           <p className="text-sm text-zinc-600 mb-6 leading-relaxed">
             {query
               ? `We couldn't find any products matching "${query}".`
-              : "No catalogue matches returned for this search."}{" "}
-            Start a fresh conversation or try one of the popular items below:
+              : "No catalogue matches returned for this search."}
           </p>
-
-          {onNewConversation && (
-            <div className="flex justify-center mb-6">
-              <button
-                type="button"
-                onClick={onNewConversation}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-cal font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
-              >
-                <MessageSquarePlus className="w-4 h-4" />
-                <span>Start New Conversation</span>
-              </button>
-            </div>
-          )}
 
           <div className="flex flex-wrap items-center justify-center gap-2 pt-4 border-t border-zinc-200/80">
             {NO_RESULT_SUGGESTIONS.map((item) => (
@@ -111,14 +121,34 @@ export default function ProductResultsSection({
         <div className="flex items-center gap-1.5">
           <IconButton
             icon={ChevronLeft}
-            ariaLabel="Previous products"
-            title="Previous products"
+            onClick={handlePrev}
+            disabled={!canPrev}
+            ariaLabel={
+              prevLabel
+                ? `Previous search: "${prevLabel}"`
+                : "No previous search in this conversation"
+            }
+            title={
+              prevLabel
+                ? `Previous search: "${prevLabel}"`
+                : "No previous search in this conversation"
+            }
             rounded="full"
           />
           <IconButton
             icon={ChevronRight}
-            ariaLabel="Next products"
-            title="Next products"
+            onClick={handleNext}
+            disabled={!canNext}
+            ariaLabel={
+              nextLabel
+                ? `Next search: "${nextLabel}"`
+                : "No next search in this conversation"
+            }
+            title={
+              nextLabel
+                ? `Next search: "${nextLabel}"`
+                : "No next search in this conversation"
+            }
             rounded="full"
           />
         </div>
@@ -148,8 +178,8 @@ export default function ProductResultsSection({
         })}
       </div>
 
-      {/* Channel3 Conversational Response & Follow-up Prompt Chips */}
-      <div className="mt-8 text-center space-y-3.5 max-w-2xl mx-auto">
+      {/* Channel3 Conversational Response */}
+      <div className="mt-8 text-center max-w-2xl mx-auto">
         <GsapTextReveal
           as="p"
           className="font-cal text-xs sm:text-sm text-slate-700 leading-relaxed"
@@ -158,33 +188,8 @@ export default function ProductResultsSection({
           duration={0.6}
           y="100%"
         >
-          {`I found ${recommendations.length} live ${intent?.category || ""} options${intent?.searchQuery ? ` for "${intent.searchQuery}"` : ""}. Hover any card to inspect merchant stock stack and lock with PayPal:`}
+          {`I found ${recommendations.length} live ${intent?.category || ""} options${intent?.searchQuery ? ` for "${intent.searchQuery}"` : ""}. Hover any card to inspect merchant stock stack and lock with PayPal.`}
         </GsapTextReveal>
-
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {[
-            `Show lower price options`,
-            `Show only verified in-stock`,
-            `Compare top 2 stores`,
-          ].map((promptChip) => (
-            <button
-              key={promptChip}
-              type="button"
-              onClick={() => {
-                const newQuery = `${query} ${promptChip}`;
-                setQuery(newQuery);
-                onSearch(null, newQuery);
-              }}
-              className="font-cal px-3 py-1.5 rounded-none border border-slate-300 bg-white hover:bg-slate-100 text-xs text-slate-800 transition-colors cursor-pointer font-medium"
-            >
-              {promptChip}
-            </button>
-          ))}
-        </div>
-
-        <div className="pt-2 text-slate-400">
-          <ChevronDown className="w-4 h-4 mx-auto animate-bounce" />
-        </div>
       </div>
     </div>
   );
