@@ -1,6 +1,7 @@
 import localFont from "next/font/local";
 import "./globals.css";
 import SmoothScroll from "@/components/SmoothScroll";
+import { Analytics } from "@vercel/analytics/next";
 
 const calSans = localFont({
   src: "./fonts/CalSansVF.woff2",
@@ -36,6 +37,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className={calSans.className} suppressHydrationWarning>
         <SmoothScroll>{children}</SmoothScroll>
+        <Analytics />
       </body>
     </html>
   );
